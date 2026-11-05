@@ -1,5 +1,5 @@
 import { store } from '../store.js';
-import { typeOf, isTask, isOpen, isOverdue, firstLine, dayKey, parseDay, whenLabel, formatDay, sortEvents } from '../events.js';
+import { typeOf, isTask, isOpen, isOverdue, firstLine, dayKey, parseDay, whenLabel, formatDay, sortEvents, shortMonth } from '../events.js';
 import { markdown, plainText } from '../md.js';
 import { html, raw, icon, plural, emptyState } from '../ui.js';
 import { eventSheet } from './calendar.js';
@@ -37,7 +37,7 @@ export function taskTable(app, list, { showSubject = true } = {}) {
       const count = materialsOf(app, ev).length;
       const desc = firstLine(ev.description);
       return html`<tr class="task-row ${ev.done ? 'is-done' : ''} ${isOverdue(ev, today) ? 'is-overdue' : ''}" data-href="${taskHref(ev)}">
-        <td class="t-due"><span class="ev-date ev-${type.key}"><strong>${d.getDate()}</strong><small>${d.toLocaleDateString('en-GB', { month: 'short' })}</small></span></td>
+        <td class="t-due"><span class="ev-date ev-${type.key}"><strong>${d.getDate()}</strong><small>${shortMonth(ev.date)}</small></span></td>
         <td class="t-what">
           <a href="${taskHref(ev)}"><strong>${ev.title}</strong></a>
           <small>${showSubject ? html`<span class="narrow"><span class="dot c-${subject?.color}"></span>${subject?.name} · </span>` : ''}${type.label} · <span class="t-when">${dueLabel(ev, today)}</span>${ev.time ? ` · ${ev.time}` : ''}</small>
@@ -92,7 +92,7 @@ export function tasksSection(app, { base, subject = null, status, kind, subjectF
       : emptyState({ iconName: 'clipboard', ...empty })}`;
 }
 
-function pickSubject(app, then) {
+export function pickSubject(app, then) {
   app.sheet({
     title: 'Which subject?',
     body: html`<div class="lang-list">${store.subjects.map(s => html`

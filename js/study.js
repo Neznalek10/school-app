@@ -7,6 +7,7 @@
  */
 import { normalize, check } from './check.js';
 import { shuffle } from './srs.js';
+import { localizePrompt, fillStudent } from './locale.js';
 
 // A learning plan is the prompt a subject uses to turn a presentation into a lesson: notes, visuals, timeline, answers and flashcards.
 // Every template asks for the same JSON shape, so one parser and one lesson page serve all subjects.
@@ -50,7 +51,7 @@ const SHAPE_EXERCISES = SHAPE.replace(/\n}$/, `,
   ]
 }`);
 
-const PROBLEMS_START = `I am a student in the first year of a Czech gymnázium, studying {subject}. Make me a lesson on the key topics I give you: notes I can learn from, with solved examples, and exercises I solve myself. Every exercise needs a detailed step-by-step solution that I only open when I need it.
+const PROBLEMS_START = `I am {student}, studying {subject}. Make me a lesson on the key topics I give you: notes I can learn from, with solved examples, and exercises I solve myself. Every exercise needs a detailed step-by-step solution that I only open when I need it.
 If I attach a worksheet, textbook pages or a presentation, use it: its tasks become the first exercises, solved in detail, and then add more of the same kind. If the key topics are missing, take them from what I attached. If nothing is attached either, reply with one short sentence asking for the topics, and make the lesson once I send them.
 
 The key topics are at the end of this message between <<< and >>>.
@@ -101,7 +102,7 @@ export const TEMPLATES = {
     unit: 'slide',
     source: PRESENTATION,
     hint: 'Notes, every picture, statue and map with its slide, a timeline of dated events, answers and flashcards',
-    prompt: `I am a Czech gymnázium student studying {subject}. I am giving you a presentation (PowerPoint, Google Slides or PDF). Read every slide, including the pictures, captions and speaker notes.
+    prompt: `I am {student}, studying {subject}. I am giving you a presentation (PowerPoint, Google Slides or PDF). Read every slide, including the pictures, captions and speaker notes.
 
 Reply with ONE JSON object inside a single \`\`\`json code block and nothing else, in exactly this shape:
 
@@ -120,7 +121,7 @@ ${COMMON_RULES}`,
     unit: 'slide',
     source: PRESENTATION,
     hint: 'Notes, key terms, diagrams with their slide, answers and flashcards',
-    prompt: `I am a Czech gymnázium student studying {subject}. I am giving you a presentation (PowerPoint, Google Slides or PDF). Read every slide, including the pictures, captions and speaker notes.
+    prompt: `I am {student}, studying {subject}. I am giving you a presentation (PowerPoint, Google Slides or PDF). Read every slide, including the pictures, captions and speaker notes.
 
 Reply with ONE JSON object inside a single \`\`\`json code block and nothing else, in exactly this shape:
 
@@ -148,7 +149,7 @@ ${COMMON_RULES}`,
       empty: 'Upload a Word document with yellow highlights, copy the prompt into ChatGPT or Gemini, and paste the answer back. You get notes, terms and flashcards from the yellow parts only.',
     },
     hint: 'A long document where only the yellow parts must be learned: notes, terms, answers and flashcards from those parts only',
-    prompt: `I am a Czech gymnázium student studying {subject}. I am giving you a long study document (Word, Google Docs or PDF). Some parts are highlighted in yellow. Only the yellow parts are required, so build everything ONLY from them.
+    prompt: `I am {student}, studying {subject}. I am giving you a long study document (Word, Google Docs or PDF). Some parts are highlighted in yellow. Only the yellow parts are required, so build everything ONLY from them.
 
 How to find the yellow parts:
 - If the highlighted parts are pasted at the end of this message between <<< and >>>, use them and ignore any attachment. There, text between == and == is highlighted. The rest of each line is surrounding context that helps you understand it, but it must not become notes or flashcards on its own. Lines starting with ## are the document's headings.
@@ -185,7 +186,7 @@ Rules:
       empty: 'Photograph the textbook pages, give them to ChatGPT or Gemini with the prompt, and paste the answer back. You get the literary movement, then its poets, philosophers, prose writers and dramatists with their lives, works, plots and how to tell the works apart, plus flashcards.',
     },
     hint: 'Photos of book pages: the literary movement, then poets, philosophers, prose writers and dramatists, each with life, works, plot and how to recognise them, plus flashcards',
-    prompt: `I am a Czech gymnázium student studying {subject} literature. I am giving you photos of pages from my textbook about a literary movement or period, for example klasicismus. Read every page, including captions, boxes, excerpts and pictures. The pages decide which movement, authors and works the lesson covers. Then research every author and work from reliable knowledge so the notes are complete enough for the maturita.
+    prompt: `I am {student}, studying {subject} literature. I am giving you photos of pages from my textbook about a literary movement or period, for example Romanticism. Read every page, including captions, boxes, excerpts and pictures. The pages decide which movement, authors and works the lesson covers. Then research every author and work from reliable knowledge so the notes are complete enough for the school-leaving exam.
 
 Reply with ONE JSON object inside a single \`\`\`json code block and nothing else, in exactly this shape:
 
@@ -236,8 +237,8 @@ Rules:
       empty: 'Write the key topics, copy the prompt into ChatGPT or Gemini, and paste the answer back. The AI researches the topics and you get notes, key terms, typical test questions and flashcards.',
       topicsExample: 'Buňka: stavba a typy\nFotosyntéza\nBuněčné dýchání',
     },
-    hint: 'You write the key topics, the AI researches them: notes for the first year of gymnázium, key terms, typical test questions and flashcards',
-    prompt: `I am a student in the first year of a Czech gymnázium, studying {subject}. Research the key topics I give you and write study notes I can learn from for tests. Search the web and use reliable sources: encyclopedias, textbooks, and university, museum or government sites. If you cannot search, use reliable knowledge and say so in the overview. If I attach my own materials, use them too.
+    hint: 'You write the key topics, the AI researches them: notes at your school level, key terms, typical test questions and flashcards',
+    prompt: `I am {student}, studying {subject}. Research the key topics I give you and write study notes I can learn from for tests. Search the web and use reliable sources: encyclopedias, textbooks, and university, museum or government sites. If you cannot search, use reliable knowledge and say so in the overview. If I attach my own materials, use them too.
 
 The key topics are at the end of this message between <<< and >>>. If they are missing, reply with one short sentence asking for them, and make the lesson once I send them.
 
@@ -246,16 +247,17 @@ Reply with ONE JSON object inside a single \`\`\`json code block and nothing els
 ${SHAPE}
 
 Rules:
-- Pitch everything at the first year of a Czech gymnázium (the RVP G curriculum): what a test there expects, not university level.
+- [CZ]Pitch everything at the first year of a Czech gymnázium (the RVP G curriculum): what a test there expects, not university level.
+- [INTL]Pitch everything at the level of {student}: what a test there expects, not university level.
 - overview: 3 to 5 sentences on what the topics cover and how they fit together.
-- notes: one ## heading per key topic, in my order, with ### subheadings where useful. Explain each topic clearly and correctly: the key facts, numbers and examples (Czech examples where they fit), processes step by step, and the differences between things that are easy to confuse. Use short bullet points and **bold** key terms. End with a ## section listing the sources you used, with their title and web address.
+- notes: one ## heading per key topic, in my order, with ### subheadings where useful. Explain each topic clearly and correctly: the key facts, numbers and examples (examples from my country where they fit), processes step by step, and the differences between things that are easy to confuse. Use short bullet points and **bold** key terms. End with a ## section listing the sources you used, with their title and web address.
 - visuals: diagrams, maps or pictures that are essential for these topics (for example the structure of a cell or a climate map), so I can look them up and recognise them. description says what it shows and what to notice. kind is one of photo, painting, statue, building, map, diagram, chart, other. Use [] if none are essential.
 - timeline: dated events if the topics have any (for example discoveries); otherwise [].
 - terms: every key term with a one-sentence definition.
 - answers: 5 to 10 typical test questions on these topics, with full model answers.
 - cards: 25 to 40 flashcards covering every topic. Mix qa, cloze, choice and compare. A cloze sentence marks the missing word, name or number with {{double braces}}. A choice card has 3 or 4 options and "a" is exactly one of them.
 - slide is always null.
-- Only use facts you are sure of and that your sources confirm. Never invent numbers, names or dates. Where sources disagree, use the value Czech textbooks teach.
+- Only use facts you are sure of and that your sources confirm. Never invent numbers, names or dates. Where sources disagree, use the value school textbooks in my country teach.
 - Write everything in the language I wrote the topics in.
 - The JSON must be valid: double quotes, no comments, no trailing commas, \\n for line breaks inside notes.`,
   },
@@ -273,7 +275,8 @@ Rules:
     },
     hint: 'Notes with solved examples, then exercises from easy to hard: you type the result, the hint and the step-by-step solution open when you ask',
     prompt: `${PROBLEMS_START}
-- Pitch everything at the first year of a Czech gymnázium (RVP G) and use Czech school conventions: decimal comma, K = {…} for solution sets, intervals like (2; 5⟩, and the check of an equation (zkouška).
+- [CZ]Pitch everything at the first year of a Czech gymnázium (RVP G) and use Czech school conventions: decimal comma, K = {…} for solution sets, intervals like (2; 5⟩, and the check of an equation (zkouška).
+- [INTL]Pitch everything at the level of {student} and use the maths conventions taught there: the usual decimal separator, notation for solution sets and intervals, and a check of every equation's solution.
 - Write maths in plain text with Unicode, never LaTeX: x², x³, √(x + 1), (a + b)/(2c), ·, :, ≤, ≥, ≠, ±, ∞, π, ∈, ∉, ∪, ∩, ∅, ℝ, ℕ. Never use $ signs or backslashes.
 - overview: 3 to 5 sentences on what the topics are and how they connect.
 - notes: one ## heading per topic, in my order. For each: definitions and rules in short bullets, every formula on its own line with what each letter means, the typical mistakes to avoid, and one or two fully solved examples under ### Vzorový příklad, written step by step like the solutions.
@@ -300,7 +303,8 @@ ${EXERCISE_FIELDS}`,
     },
     hint: 'Notes with laws, units and solved examples, then exercises from easy to hard with zápis, units and a step-by-step solution that opens when you ask',
     prompt: `${PROBLEMS_START}
-- Pitch everything at the first year of a Czech gymnázium (RVP G) and use Czech school conventions: decimal comma, quantities with their symbols and SI units, and g = 10 m/s² unless the task says to use 9,81 m/s² (always say in the task which value to use).
+- [CZ]Pitch everything at the first year of a Czech gymnázium (RVP G) and use Czech school conventions: decimal comma, quantities with their symbols and SI units, and g = 10 m/s² unless the task says to use 9,81 m/s² (always say in the task which value to use).
+- [INTL]Pitch everything at the level of {student}, with the usual decimal separator, quantities with their symbols and SI units, and say in each task which value of g to use.
 - Write formulas in plain text with Unicode, never LaTeX: v = s/t, s = ½ · a · t², m/s², kg·m/s, Δt, ·, ≈. Never use $ signs or backslashes.
 - overview: 3 to 5 sentences on what the topics are and how they connect.
 - notes: one ## heading per topic, in my order. For each: the physical quantities (name, symbol, unit), the laws and formulas each on its own line with what every letter means and its unit, how to read the related graphs, the typical mistakes (especially units), and one or two fully solved examples under ### Vzorový příklad, written step by step like the solutions.
@@ -309,7 +313,8 @@ ${EXERCISE_FIELDS}`,
   - level 1 (about a third): one formula, values already in SI units.
   - level 2 (about a third): unit conversion, rearranging the formula, or two steps.
   - level 3 (the rest): word problems from everyday life (sport, transport, music, home), tasks that combine topics, a graph described in words, or explain-why questions.
-- Every solution follows the Czech school pattern, one step each: "Zápis:" the given quantities with symbols and units and the unknown with "= ?"; "Převod jednotek:" to SI if needed; the formula and why it applies; rearranging for the unknown (letters first, numbers last); substituting with units; the result with its unit, rounded sensibly (2 to 3 significant figures); "Odpověď:" a sentence. Add a quick check of units or a rough estimate where it helps.
+- [CZ]Every solution follows the Czech school pattern, one step each: "Zápis:" the given quantities with symbols and units and the unknown with "= ?"; "Převod jednotek:" to SI if needed; the formula and why it applies; rearranging for the unknown (letters first, numbers last); substituting with units; the result with its unit, rounded sensibly (2 to 3 significant figures); "Odpověď:" a sentence. Add a quick check of units or a rough estimate where it helps.
+- [INTL]Every solution follows the usual school pattern, one step each: the given quantities with symbols and units and the unknown; unit conversion to SI if needed; the formula and why it applies; rearranging for the unknown (letters first, numbers last); substituting with units; the result with its unit, rounded sensibly (2 to 3 significant figures); a one-sentence answer. Add a quick check of units or a rough estimate where it helps.
 - values are in the unit given in unit, which is the unit the task asks for.
 ${EXERCISE_FIELDS}`,
   },
@@ -319,9 +324,17 @@ ${EXERCISE_FIELDS}`,
 const DEFAULT_TEMPLATES = { history: 'history', zsv: 'highlights', czech: 'literature', biology: 'research', geography: 'research', chemistry: 'research', math: 'math', physics: 'physics' };
 export const defaultTemplate = subject => DEFAULT_TEMPLATES[subject.id] || 'general';
 
+/**
+ * A built-in template's prompt for this account's country (see localizePrompt), with {subject} and {student} unfilled.
+ *
+ * @param {string} key A key of TEMPLATES.
+ * @returns {string} The prompt text.
+ */
+export const templatePrompt = key => localizePrompt(TEMPLATES[key].prompt);
+
 export function planOf(subject) {
   const template = TEMPLATES[subject.plan?.template] ? subject.plan.template : defaultTemplate(subject);
-  return { template, custom: !!subject.plan?.prompt, prompt: subject.plan?.prompt || TEMPLATES[template].prompt };
+  return { template, custom: !!subject.plan?.prompt, prompt: subject.plan?.prompt || templatePrompt(template) };
 }
 
 /**
@@ -346,7 +359,7 @@ export function profileLine(subject) {
  */
 export function promptFor(subject, { highlights = '', topics = '' } = {}) {
   // A function replacer keeps `$&` and similar in a subject name literal.
-  const base = planOf(subject).prompt.replaceAll('{subject}', () => subject.name);
+  const base = fillStudent(planOf(subject).prompt.replaceAll('{subject}', () => subject.name));
   const prompt = [base, profileLine(subject), subject.plan?.extra].filter(Boolean).join('\n\n');
   if (highlights) return `${prompt}\n\nTHE HIGHLIGHTED PARTS:\n<<<\n${highlights}\n>>>`;
   return topics.trim() ? `${prompt}\n\nMY KEY TOPICS:\n<<<\n${topics.trim()}\n>>>` : prompt;

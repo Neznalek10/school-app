@@ -8,6 +8,7 @@
  */
 import { czechItems } from './czech.js';
 import { dayKey, parseDay } from './events.js';
+import { uiLanguage } from './locale.js';
 
 /** Countries Nager.Date has public holidays for (https://date.nager.at/api/v3/AvailableCountries). */
 export const COUNTRIES = ('AD AG AI AL AM AO AR AT AU AW AX BA BB BD BE BF BG BH BI BJ BL BM BO BQ BR BS BW BY BZ CA '
@@ -31,14 +32,14 @@ const failed = new Set();
 const pending = new Set();
 
 /**
- * English name of a country code, for the picker.
+ * Name of a country code in the interface language, for the picker and headings.
  *
  * @param {string} code ISO 3166 alpha-2 code, for example "DE".
- * @returns {string} "Germany", or the code itself when the browser has no name for it.
+ * @returns {string} "Germany" or "Německo", or the code itself when the browser has no name for it.
  */
 export function countryName(code) {
   try {
-    return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) || code;
+    return new Intl.DisplayNames([uiLanguage()], { type: 'region' }).of(code) || code;
   } catch {
     return code;
   }

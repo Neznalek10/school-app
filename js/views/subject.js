@@ -11,7 +11,7 @@
 import { store, uid } from '../store.js';
 import { APPS, appUrl, appStats } from '../apps.js';
 import { aiReady, aiSettings, externalPrompt } from '../ai.js';
-import { COLORS, SUBJECT_ICONS, KITS, assistantsOf, hasTool, subjectFromKit } from '../subjects.js';
+import { COLORS, SUBJECT_ICONS, kitsFor, assistantsOf, hasTool, subjectFromKit } from '../subjects.js';
 import { addBuiltInLesson } from '../soustavy.js';
 import { html, icon, plural, pct, segmented, onSegmented, emptyState, masteryBar } from '../ui.js';
 import { upcoming, whenLabel, isTask, isOpen } from '../events.js';
@@ -25,6 +25,9 @@ import { lessonsPanel, mountLessons, lessonsOf, lessonStats, lessonHref } from '
 import { startStudy } from './study.js';
 import { chemPracticeCard } from './chem.js';
 import { exerciseStats, startExercises } from './exercises.js';
+import { bindDraft } from '../drafts.js';
+import { formatDate } from '../locale.js';
+import { isCzechSchool } from '../locale.js';
 
 const chatKey = (subjectId, assistantId) => `${subjectId}/${assistantId}`;
 
@@ -38,6 +41,7 @@ const chatKey = (subjectId, assistantId) => `${subjectId}/${assistantId}`;
  * @param {object|null} [subject] The subject to edit; null creates a new one.
  */
 export function subjectSheet(app, subject = null) {
+  const kits = kitsFor(isCzechSchool());
   let kit = null;
   let iconName = subject?.icon || 'book';
   let color = subject?.color || COLORS[store.subjects.length % COLORS.length];
@@ -47,7 +51,7 @@ export function subjectSheet(app, subject = null) {
       ${subject ? '' : html`<div class="field-label" id="kit-label">Start from</div>
         <div class="chips wrap kit-row" role="group" aria-labelledby="kit-label">
           <button type="button" class="chip active" data-kit="">None</button>
-          ${KITS.map(k => html`<button type="button" class="chip" data-kit="${k.id}">${icon(k.icon)}${k.name}</button>`)}
+          ${kits.map(k => html`<button type="button" class="chip" data-kit="${k.id}">${icon(k.icon)}${k.name}</button>`)}
         </div>`}
       <label class="field-label" for="subject-name">Name</label>
       <input class="input" id="subject-name" name="name" maxlength="40" value="${subject?.name || ''}" placeholder="e.g. Civics" autocomplete="off">
@@ -61,6 +65,7 @@ export function subjectSheet(app, subject = null) {
     </form>`,
     onMount(body, close) {
       const form = body.querySelector('form');
+      const draft = bindDraft(form, `subject:${subject?.id || 'new'}`);
       // Marks the button whose data-<attr> equals `value` as the active one of its group.
       const mark = (attr, value) => body.querySelectorAll(`[data-${attr}]`).forEach(b => b.classList.toggle('active', b.dataset[attr] === value));
       const pick = (attr, set) => body.querySelectorAll(`[data-${attr}]`).forEach(btn => btn.addEventListener('click', () => {
@@ -71,7 +76,7 @@ export function subjectSheet(app, subject = null) {
       pick('color', v => { color = v; });
       // A kit prefills the name, icon and colour; "None" keeps whatever is typed and picked.
       pick('kit', id => {
-        kit = KITS.find(k => k.id === id) || null;
+        kit = kits.find(k => k.id === id) || null;
         if (!kit) return;
         form.name.value = kit.name;
         iconName = kit.icon;
@@ -97,6 +102,7 @@ export function subjectSheet(app, subject = null) {
           store.save('lessons');
         }
         store.save('subjects');
+        draft.clear();
         app.refreshSide();
         close();
         // A new subject opens its setup page so the student can personalise it right away.
@@ -147,6 +153,7 @@ export function assistantSheet(app, subject, assistant = null) {
     </form>`,
     onMount(body, close) {
       const form = body.querySelector('form');
+      const draft = bindDraft(form, `assistant:${subject.id}:${assistant?.id || 'new'}`);
       onSegmented(body, (name, value) => { useNotes = value === 'yes'; });
       form.addEventListener('submit', e => {
         e.preventDefault();
@@ -162,6 +169,7 @@ export function assistantSheet(app, subject, assistant = null) {
         if (assistant) Object.assign(subject.assistants.find(a => a.id === assistant.id), { name, prompt, useNotes });
         else subject.assistants.push({ id: uid('c'), name, prompt, useNotes });
         store.save('subjects');
+        draft.clear();
         close();
         app.render();
       });
@@ -191,7 +199,7 @@ function setupCard(subject) {
   const href = `#/setup/${encodeURIComponent(subject.id)}`;
   // After setup the same card stays reachable so the student can read the profile or run the interview again.
   const [title, line] = subject.setupAt
-    ? ['Profile and setup', `Set up with AI on ${new Date(subject.setupAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}. Run the interview again to change it.`]
+    ? ['Profile and setup', `Set up with AI on ${formatDate(subject.setupAt, { day: 'numeric', month: 'short', year: 'numeric' })}. Run the interview again to change it.`]
     : ['Set up with AI', `A short interview tailors ${subject.name}'s plan, assistants and tools to your class`];
   return html`<a class="card prompts-link setup-card" href="${href}">
     <span class="assistant-icon">${icon('sparkle')}</span>

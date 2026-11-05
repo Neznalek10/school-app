@@ -15,6 +15,7 @@
  * placeholder everywhere in an assistant prompt, which would damage the instructions about it.
  */
 import { TEMPLATES, extractJson } from './study.js';
+import { studentText, isCzechSchool } from './locale.js';
 
 /** Id of the setup assistant; it is a preset, so it is never stored on the subject. */
 export const SETUP_ID = 'setup';
@@ -89,7 +90,7 @@ export function setupPrompt(subject) {
   const current = subject.profile
     ? `\nThe student already did a setup. The current profile is: ${subject.profile}\nStart by checking what is still true and what changed, and keep what is still right.\n`
     : '';
-  return `You set up the subject "${subject.name}" in a study app for a student in the first year of a Czech gymnázium (age 15 to 16). You interview the student about this subject in their class, so the app's assistants and learning plans fit it. At the end you produce one JSON setup.
+  return `You set up the subject "${subject.name}" in a study app for ${studentText()}. You interview the student about this subject in their class, so the app's assistants and learning plans fit it. At the end you produce one JSON setup.
 ${current}
 INTERVIEW RULES
 - Ask exactly one question per message. Never put two questions in one message and never send a list of questions. Keep each message short, friendly and easy to read on a phone.
@@ -105,15 +106,15 @@ When you have enough, say in one short sentence that the setup is ready. Then ou
 ${SETUP_SHAPE}
 
 FIELD RULES
-- profile: plain facts about this subject in this class: topics, sources, test format, teacher's priorities, what is hard, goals, preferred answer language. Write it in English and keep Czech terms as they are. Every assistant reads it, so keep it accurate and compact.
+- profile: plain facts about this subject in this class: topics, sources, test format, teacher's priorities, what is hard, goals, preferred answer language. Write it in English and keep subject terms in the language the class uses. Every assistant reads it, so keep it accurate and compact.
 - plan.template: the key of the template that fits how the student gets learning material. Allowed keys:
 ${templates}
 - plan.extra: extra instructions added to every lesson prompt for this subject, for example the test style or what to stress. Use "" if there is nothing.
 - assistants: 0 to ${MAX_SETUP_ASSISTANTS}, only helpers that clearly fit what the student told you (for example practice in the teacher's test format). Do not copy the general tutor or quiz assistants, the app already has them. name is at most ${NAME_MAX} characters, blurb at most ${BLURB_MAX}. icon is always "bulb". prompt is ${PROMPT_MIN} to ${PROMPT_MAX} characters of instructions to the assistant, written as "You are ..." and naming the subject "${subject.name}" in plain text.
 - tools: keys from this list, only when they clearly help in this subject. Use [] otherwise.
-${describeKeys(SETUP_TOOLS)}
+${describeKeys(isCzechSchool() ? SETUP_TOOLS : {})}
 - lessons: keys from this list, only when they clearly help in this subject. Use [] otherwise.
-${describeKeys(SETUP_LESSONS)}
+${describeKeys(isCzechSchool() ? SETUP_LESSONS : {})}
 - The JSON must be valid: double quotes, no comments, no trailing commas, \\n for line breaks inside strings. Add no other fields.`;
 }
 

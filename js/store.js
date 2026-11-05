@@ -9,15 +9,23 @@
 import { defaultSubjects, addLaterDefaults, LATER_DEFAULTS } from './subjects.js';
 import { migrateEvents } from './events.js';
 import { CZECH, defaultCountry } from './holidays.js';
+import { setLocale, browserLanguage } from './locale.js';
 
 const PREFIX = 'school.';
 const memory = {};
 
 export const DEFAULT_AI = { url: 'https://openrouter.ai/api/v1', key: '', model: 'openrouter/free' };
+/** Formats follow the signed-in account's interface language and country. */
+const applyLocale = settings => setLocale({ language: settings.uiLanguage, country: settings.country, school: settings.school });
+
 const DEFAULT_SETTINGS = {
   theme: 'system',
   ai: { ...DEFAULT_AI },
   aiLanguage: 'en',
+  // Accounts from before the language setting had the English interface; new ones follow the browser.
+  uiLanguage: 'en',
+  // How the AI prompts describe the student; empty means "derived from the country".
+  school: '',
   // Accounts from before the country setting all used the Czech calendar; new ones get the browser's country.
   country: CZECH,
   czech: { holidays: true, important: true, district: '' },
@@ -80,7 +88,7 @@ export const store = {
     write(`${account.id}.subjects`, defaultSubjects());
     // Nothing is added later to a brand new account, so record every later default as handled.
     // The AI block is stored from the start so a key from .env has a config object to be filled into.
-    write(`${account.id}.settings`, { addedDefaults: [...LATER_DEFAULTS], ai: { ...DEFAULT_AI }, country: defaultCountry() });
+    write(`${account.id}.settings`, { addedDefaults: [...LATER_DEFAULTS], ai: { ...DEFAULT_AI }, country: defaultCountry(), uiLanguage: browserLanguage(), aiLanguage: browserLanguage() });
     return account;
   },
   nameTaken(name) {
@@ -107,6 +115,7 @@ export const store = {
       write(key('settings'), this.settings);
     }
     session(id);
+    applyLocale(this.settings);
     return true;
   },
   lastAccount() {
@@ -137,8 +146,10 @@ export const store = {
     this.account = null;
     this.settings = { ...DEFAULT_SETTINGS };
     session(null);
+    setLocale({ language: browserLanguage() });
   },
   save(key) {
     write(`${this.account.id}.${key}`, this[key]);
+    if (key === 'settings') applyLocale(this.settings);
   },
 };
