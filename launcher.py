@@ -327,7 +327,7 @@ def install(root: Path = PROJECT_ROOT, on_desktop: bool = True) -> list[Path]:
 
     Args:
         root: The project folder.
-        on_desktop: Also put the shortcut on the Desktop (marked trusted, so GNOME lets it launch).
+        on_desktop: Also put the shortcut on the Desktop (see mark_trusted for GNOME's launch permission).
 
     Returns:
         The shortcut files written.
@@ -346,14 +346,25 @@ def install(root: Path = PROJECT_ROOT, on_desktop: bool = True) -> list[Path]:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(text, encoding="utf-8")
         target.chmod(0o755)
-    if len(targets) > 1:
-        # GNOME's desktop icons only launch files marked trusted; without gio the user can allow it by hand.
-        try:
-            subprocess.run(["gio", "set", str(targets[1]), "metadata::trusted", "true"],
-                           capture_output=True, timeout=5, check=False)
-        except (OSError, subprocess.SubprocessError):
-            pass
     return targets
+
+
+def mark_trusted(path: Path) -> bool:
+    """Mark a Desktop shortcut as trusted so GNOME's desktop icons launch it on a double click.
+
+    Args:
+        path: The .desktop file on the Desktop.
+
+    Returns:
+        True when gio set the mark; False when it could not (no gio or no metadata service), and the
+        user then allows it once by hand (right-click, "Allow Launching").
+    """
+    try:
+        done = subprocess.run(["gio", "set", str(path), "metadata::trusted", "true"],
+                              capture_output=True, timeout=5, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return done.returncode == 0
 
 
 def uninstall() -> list[Path]:
@@ -406,8 +417,12 @@ def main(argv: list[str] | None = None) -> int:
     options = build_parser().parse_args(argv)
     try:
         if options.install:
-            for path in install(on_desktop=not options.no_desktop):
+            written = install(on_desktop=not options.no_desktop)
+            for path in written:
                 print(f"Shortcut: {path}")
+            # The menu entry needs no mark; only the Desktop copy (the second file) does.
+            if len(written) > 1 and not mark_trusted(written[1]):
+                print('On the Desktop, right-click "School app" once and choose "Allow Launching".')
             print('Open "School app" from the app menu or the Desktop.')
         elif options.uninstall:
             removed = uninstall()

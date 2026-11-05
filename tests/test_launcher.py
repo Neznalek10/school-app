@@ -160,7 +160,7 @@ class InstallTests(unittest.TestCase):
         self.desktop.mkdir()
         self.enterContext(mock.patch.dict(os.environ, {"XDG_DATA_HOME": str(self.home / "share")}))
         self.enterContext(mock.patch.object(launcher, "desktop_dir", return_value=self.desktop))
-        # gio is not needed for the test; the call is best effort.
+        # gio and xdg-user-dir are replaced; mark_trusted's test sets the reply it needs.
         self.enterContext(mock.patch.object(launcher.subprocess, "run"))
 
     def test_install_writes_executable_shortcuts_to_the_menu_and_the_desktop(self) -> None:
@@ -179,6 +179,12 @@ class InstallTests(unittest.TestCase):
         with self.assertRaises(launcher.LauncherError) as raised:
             launcher.install(self.home / "elsewhere")
         self.assertIn("python3 -m venv venv", str(raised.exception))
+
+    def test_mark_trusted_reports_whether_gio_succeeded(self) -> None:
+        launcher.subprocess.run.return_value = mock.Mock(returncode=0)
+        self.assertTrue(launcher.mark_trusted(self.desktop / "x.desktop"))
+        launcher.subprocess.run.return_value = mock.Mock(returncode=1)
+        self.assertFalse(launcher.mark_trusted(self.desktop / "x.desktop"))
 
     def test_uninstall_removes_what_install_wrote(self) -> None:
         written = launcher.install(self.root)
