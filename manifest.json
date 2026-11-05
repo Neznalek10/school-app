@@ -5,7 +5,7 @@
   "description": "Subjects, notes, AI tutors and language practice in one place.",
   "start_url": "./",
   "scope": "./",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "portrait",
   "background_color": "#f3f3f0",
   "theme_color": "#f3f3f0",

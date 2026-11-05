@@ -136,12 +136,15 @@ commit_public_tree() {
   echo "Public branch updated: ${commit:0:10}"
 }
 
-# Clones the public branch into the target on the first run, otherwise fast-forwards the existing clone.
+# Clones the public branch into the target on the first run, otherwise merges it into the existing clone.
+# A merge (not a fast-forward) keeps commits made only on GitHub, such as a LICENSE added there.
 # Args: $1 target folder.
 sync_target() {
   local target="$1"
   if [[ -d "$target/.git" ]]; then
-    git -C "$target" pull --ff-only local public
+    local name="${PUBLIC_AUTHOR_NAME:-$DEFAULT_AUTHOR_NAME}" email="${PUBLIC_AUTHOR_EMAIL:-$DEFAULT_AUTHOR_EMAIL}"
+    GIT_AUTHOR_NAME="$name" GIT_AUTHOR_EMAIL="$email" GIT_COMMITTER_NAME="$name" \
+      GIT_COMMITTER_EMAIL="$email" git -C "$target" pull --no-rebase --no-edit local public
   else
     # --no-local forces a real pack transfer (no hardlinked or copied object store), and --single-branch
     # --no-tags brings only the public history: private branches, tags and their blobs stay out of the target.
