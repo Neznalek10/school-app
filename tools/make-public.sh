@@ -143,8 +143,10 @@ sync_target() {
   local target="$1"
   if [[ -d "$target/.git" ]]; then
     local name="${PUBLIC_AUTHOR_NAME:-$DEFAULT_AUTHOR_NAME}" email="${PUBLIC_AUTHOR_EMAIL:-$DEFAULT_AUTHOR_EMAIL}"
+    git -C "$target" fetch --quiet local public
+    # A fixed message, because git's default one names this folder's local path.
     GIT_AUTHOR_NAME="$name" GIT_AUTHOR_EMAIL="$email" GIT_COMMITTER_NAME="$name" \
-      GIT_COMMITTER_EMAIL="$email" git -C "$target" pull --no-rebase --no-edit local public
+      GIT_COMMITTER_EMAIL="$email" git -C "$target" merge --quiet -m "Update the public copy" local/public
   else
     # --no-local forces a real pack transfer (no hardlinked or copied object store), and --single-branch
     # --no-tags brings only the public history: private branches, tags and their blobs stay out of the target.
