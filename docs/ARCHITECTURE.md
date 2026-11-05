@@ -69,6 +69,7 @@ Two rules shape everything else:
 | Path | Responsibility |
 |---|---|
 | `sw.js` (dashboard and apps) | Offline cache. Never caches `/api/`. |
+| `js/update.js` | Applies new versions on its own: checks when the app returns to the screen, reloads once (never while typing) and shows "Updated to version X". |
 | `tools/test.sh` | Runs both test suites. |
 | `tools/make-public.sh` | Builds the public branch and the public folder. |
 | `.github/workflows/tests.yml` | Runs the tests on push and pull request in the public copy. |

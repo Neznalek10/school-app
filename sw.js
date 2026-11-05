@@ -41,6 +41,7 @@ const CORE = [
   './js/sync/page.js',
   './js/sync/snapshot.js',
   './js/ui.js',
+  './js/update.js',
   './js/views/account.js',
   './js/views/accounts.js',
   './js/views/backup-ui.js',

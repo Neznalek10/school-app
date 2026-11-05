@@ -4,6 +4,12 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 The 1.x history lived in the earlier project (school-learning-app). This file starts at 2.0.0.
 
+## [2.1.0] - 2026-11-05
+
+### Added
+
+- Updates apply on their own. When the app comes back to the screen it checks for a new version, reloads once and shows "Updated to version X". It waits while you are typing, so nothing you write is lost. No reinstall and no Check for updates tap needed.
+
 ## [2.0.1] - 2026-11-05
 
 ### Changed
