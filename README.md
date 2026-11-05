@@ -50,7 +50,7 @@ It was built for a Czech secondary school (gymnázium). The interface is in Engl
 | Move to another computer | Back up and restore a file by hand | Copy the folder, or use git |
 | AI key | Typed once per browser | Saved in `.env`, filled in for you |
 
-**Online.** If the repository owner has turned on GitHub Pages, open `https://<account>.github.io/school-app/` (replace `<account>` with the GitHub account name). The app runs fully in your browser. Account › Storage says "Saved in this browser only". Use Account › Back up now and then, because clearing the browser's site data deletes your progress.
+**Online.** If the repository owner has turned on GitHub Pages, open `https://<account>.github.io/school-app/` (replace `<account>` with the GitHub account name). The app runs fully in your browser. Account › Storage says "Saved in this browser only". Use Account › Back up now and then, because clearing the browser's site data deletes your progress. To host your own copy, push it to GitHub and set Settings › Pages › Source to **GitHub Actions**; `.github/workflows/pages.yml` publishes every push to `main`.
 
 **On your computer.** Follow the installation below. This is the full version: progress is written to a file within about two seconds of every change.
 
