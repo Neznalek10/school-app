@@ -1,14 +1,7 @@
-/**
- * French app entry: builds the shell (topbar, navigation, toasts, sheets), routes screens and starts the app.
- *
- * Loaded by apps/french/index.html; uses the store, data loaders and every view. Invariant: no inline
- * event handlers are rendered, because the server's Content-Security-Policy blocks them.
- */
 import { store } from './store.js';
-import { loadLibrary, buildLibrary, langName, langFlag } from './data.js';
+import { loadLibrary, buildLibrary, langName, langFlag, baseLang, guessBase } from './data.js';
 import { summarize, pickSession } from './srs.js';
 import { html, icon, plural, pct, applyTheme } from './ui.js';
-import { embedParams } from './embed.js';
 import { homeView } from './views/home.js';
 import { decksView, deckView } from './views/decks.js';
 import { wordsView } from './views/words.js';
@@ -32,6 +25,10 @@ import { writeView } from './views/write-tab.js';
 import { speakView } from './views/speak.js';
 import { chatView } from './views/free.js';
 import { mistakesView } from './views/mistakes.js';
+import { startTranslating, applyLanguage } from './i18n.js';
+import { initFolder } from './folder.js';
+import { embedParams } from './embed.js';
+import { syncState, onSyncChange, dismissConflictNotice } from '../../../js/sync/engine.js';
 
 const ROUTES = {
   home: homeView,
@@ -77,6 +74,7 @@ const $ = sel => document.querySelector(sel);
 
 export const app = {
   version: self.APP_VERSION || 'dev',
+  // Set when the school dashboard opened this app: its profile and the link back to the dashboard.
   embed: embedParams(location.search, location.href),
   sources: [],
   unitMeta: {},
@@ -140,8 +138,13 @@ export const app = {
     }
   },
 
-  signIn(id) {
+  async signIn(id) {
     store.useAccount(id);
+    if (store.settings.base !== baseLang()) {
+      if (!await loadContent(store.settings.base)) return;
+      renderTabs();
+      applyLanguage();
+    }
     const schema = store.learn.schema || 1;
     if (migrateLearn(store.learn)) store.save('learn');
     if (repackWords(store.additions, store.imports, schema)) {
@@ -153,16 +156,31 @@ export const app = {
     this.go('home', { replace: true });
   },
 
-  switchAccount() {
-    if (this.embed.home) return void location.assign(this.embed.home);
-    store.signOut();
+  clearSessions() {
     this.session = null;
     this.conjSession = null;
     this.learnSession = null;
     this.writeSession = null;
     this.chatSession = null;
+  },
+
+  switchAccount() {
+    if (this.embed.home) return void location.assign(this.embed.home);
+    store.signOut();
+    this.clearSessions();
     applyTheme();
     this.go('accounts');
+  },
+
+  async setBase(code) {
+    store.settings.base = code;
+    store.save('settings');
+    this.clearSessions();
+    if (!await loadContent(code)) return;
+    renderTabs();
+    applyLanguage();
+    this.reload();
+    this.go('settings', { replace: true });
   },
 
   startSession({ decks, pool, mode = 'smart', count = store.settings.sessionLength, title, words, next }) {
@@ -310,13 +328,16 @@ export const app = {
   },
 };
 
-function renderShell() {
-  const home = app.embed.home;
+function renderTabs() {
   $('#tabbar').innerHTML = html`
     <div class="brand"><span class="brand-mark">${icon('repeat')}</span><span>Vocab</span></div>
-    ${home ? html`<a class="tab tab-school" href="${home}">${icon('back')}<span>School</span></a>` : ''}
+    ${app.embed.home ? html`<a class="tab tab-school" href="${app.embed.home}">${icon('back')}<span>School</span></a>` : ''}
     ${TABS.map(t => html`<a class="tab" href="#/${t.route}" data-route="${t.route}">${icon(t.icon)}<span>${t.label}</span></a>`)}
     <div class="brand-version">v${app.version}</div>`.s;
+}
+
+function renderShell() {
+  renderTabs();
   $('#topbar').addEventListener('click', e => {
     if (e.target.closest('[data-action="language"]')) app.languageSheet();
   });
@@ -324,14 +345,17 @@ function renderShell() {
 
 // Grammar isn't needed to start, so it loads after the first screen and views wait for it if they have to.
 function loadGrammarLater(paths) {
+  app.grammar = {};
   app.grammarLangs = Object.keys(paths);
   if (!app.grammarLangs.length) return;
   app.grammarPending = true;
-  app.grammarReady = loadGrammar(paths).then(({ grammar, errors }) => {
+  const ready = loadGrammar(paths).then(({ grammar, errors }) => {
+    if (app.grammarReady !== ready) return;
     app.grammar = grammar;
     app.grammarPending = false;
     if (errors.length) app.toast(`Some grammar files failed to load: ${errors.join('; ')}`, { kind: 'error', duration: 8000 });
   });
+  app.grammarReady = ready;
 }
 
 function registerServiceWorker() {
@@ -339,19 +363,10 @@ function registerServiceWorker() {
   navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
 }
 
-/**
- * Boots the app: loads the word library and courses, shows an error screen when that fails,
- * then signs in the dashboard's profile (embedded) or shows the profile picker.
- *
- * @returns {Promise<void>}
- */
-async function start() {
-  applyTheme();
-  renderShell();
-  registerServiceWorker();
-  navigator.storage?.persist?.().catch(() => {});
+// Loads every word, lesson and drill for one learner language. Returns false after showing the error screen.
+async function loadContent(base) {
   try {
-    const { sources, errors, conjugations, units, courses, grammar, writing, speaking, drills, translate } = await loadLibrary();
+    const { sources, errors, conjugations, units, courses, grammar, writing, speaking, drills, translate } = await loadLibrary(base);
     loadGrammarLater(grammar);
     const written = await loadWriting(writing);
     app.writing = written.writing;
@@ -377,14 +392,43 @@ async function start() {
       <p>Open the app once while online so it can save the word list for offline use. (${e.message})</p>
       <button class="btn btn-primary" data-reload>${icon('refresh')}Try again</button>
     </div>`.s;
-    // An inline onclick is blocked by the page's Content-Security-Policy, so the handler is attached here.
-    $('#view').querySelector('[data-reload]').addEventListener('click', () => location.reload());
-    return;
+    // No inline onclick: serve.py's Content-Security-Policy blocks inline handlers.
+    $('#view [data-reload]').addEventListener('click', () => location.reload());
+    return false;
   }
   if (app.errors.length) app.toast(`Some decks failed to load: ${app.errors.join('; ')}`, { kind: 'error', duration: 8000 });
+  return true;
+}
+
+// Most devices have one profile, so its language is loaded up front; another profile's loads when it signs in.
+function startBase() {
+  const bases = new Set(store.accounts.map(a => store.baseOf(a.id)));
+  return bases.size === 1 ? [...bases][0] : bases.size ? 'cs' : guessBase();
+}
+
+// Tells the user once when this tab's changes lost against a newer data file and were kept in data/conflicts/.
+function watchConflictNotice() {
+  const check = () => {
+    if (!syncState.conflictSaved) return;
+    dismissConflictNotice();
+    app.toast('This page had older changes than the data file. They were saved in data/conflicts/ and the newer data was loaded.', { kind: 'info', duration: 9000 });
+  };
+  onSyncChange(check);
+  check();
+}
+
+async function start() {
+  applyTheme();
+  renderShell();
+  registerServiceWorker();
+  navigator.storage?.persist?.().catch(() => {});
+  await initFolder().catch(() => {});
+  if (!await loadContent(startBase())) return;
+  startTranslating();
   window.addEventListener('hashchange', () => app.render());
+  watchConflictNotice();
   const { profile } = app.embed;
-  if (profile) return app.signIn(store.ensureAccount(profile.id, profile.name).id);
+  if (profile) return app.signIn(store.ensureAccount(profile.id, profile.name, guessBase()).id);
   app.go('accounts', { replace: true });
 }
 

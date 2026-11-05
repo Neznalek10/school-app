@@ -1,10 +1,3 @@
-/**
- * Backup file format of the French app: building, naming and reading profile backups.
- *
- * Used by the backup screens; tested in tests/js/apps.test.mjs. Invariant: parseBackup drops settings.ai
- * from the file so a shared backup can't redirect AI requests. withoutAi is a deliberate copy of the
- * dashboard rule in js/backup.js: the apps are standalone forks that must not import from the dashboard.
- */
 export const BACKUP_FORMAT = 1;
 export const BACKUP_KEYS = ['progress', 'conj', 'learn', 'write', 'activity', 'imports', 'additions', 'settings', 'lang'];
 const OBJECT_KEYS = ['progress', 'conj', 'learn', 'write', 'activity', 'additions', 'settings'];
@@ -23,30 +16,15 @@ export function buildBackup(source, { name, version, now = new Date() }) {
   return { app: 'vocab', format: BACKUP_FORMAT, appVersion: version, exported: now.toISOString(), account: { name }, data };
 }
 
+const safeName = name => String(name).normalize('NFKD').replace(/\p{M}+/gu, '').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'profile';
+
 export function backupFileName(name, now = new Date()) {
-  const safe = String(name).normalize('NFKD').replace(/\p{M}+/gu, '').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'profile';
-  return `vocab-backup-${safe}-${now.toISOString().slice(0, 10)}.json`;
+  return `vocab-backup-${safeName(name)}-${now.toISOString().slice(0, 10)}.json`;
 }
 
-/**
- * Copies settings without the `ai` entry.
- *
- * @param {object} settings The `settings` object from a backup file.
- * @returns {object} A shallow copy with no `ai` key.
- */
-function withoutAi(settings) {
-  const copy = { ...settings };
-  delete copy.ai;
-  return copy;
-}
+// The id keeps two names that look alike once accents are gone ("Lukáš", "Lukas") in separate files.
+export const profileFileName = (name, id) => `vocab-${safeName(name)}-${id}.json`;
 
-/**
- * Reads and validates backup text. Settings come back without `ai`.
- *
- * @param {string} text Contents of the file.
- * @returns {{name: string, exported: string|null, data: object}} Profile name and cleaned data.
- * @throws {Error} With a user-readable message when the file is not a backup of this app or is damaged.
- */
 export function parseBackup(text) {
   let file;
   try {
@@ -63,14 +41,18 @@ export function parseBackup(text) {
     data[key] = file.data[key];
   }
   // The AI address and key never come from a file: a shared backup could otherwise send requests to another host.
-  if (data.settings) data.settings = withoutAi(data.settings);
+  if (data.settings) {
+    data.settings = { ...data.settings };
+    delete data.settings.ai;
+  }
   if (file.data.imports !== undefined) {
     if (!Array.isArray(file.data.imports)) throw new Error('The backup is damaged (imports has the wrong shape).');
     data.imports = file.data.imports;
   }
   if (typeof file.data.lang === 'string') data.lang = file.data.lang;
   const name = String(file.account?.name || 'Restored').trim().slice(0, 24) || 'Restored';
-  return { name, exported: file.exported || null, data };
+  const id = /^a[0-9a-z]{1,20}$/.test(file.account?.id) ? file.account.id : null;
+  return { name, id, exported: file.exported || null, data };
 }
 
 export function backupSummary(data) {
