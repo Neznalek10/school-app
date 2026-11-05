@@ -8,6 +8,7 @@ import { subjectSheet } from './subject.js';
 import { upcoming, isTask, dayKey } from '../events.js';
 import { eventRow, calendarHref, czRow } from './calendar.js';
 import { calendarItems, fetchMissingHolidays } from '../holidays.js';
+import { formatDate } from '../locale.js';
 
 function languageHero(app) {
   const account = store.account;
@@ -15,7 +16,7 @@ function languageHero(app) {
   const stats = Object.fromEntries(keys.map(k => [k, appStats(k, account.id)]));
   const today = keys.reduce((n, k) => n + stats[k].today, 0);
   const best = Math.max(...keys.map(k => stats[k].streak));
-  const date = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  const date = formatDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long' });
   return html`<section class="hero">
     <div class="hero-eyebrow">${date}</div>
     <div class="hero-figure">${fmt(today)}</div>

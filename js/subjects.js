@@ -31,18 +31,37 @@ export const SUBJECT_ICONS = ['book', 'math', 'atom', 'flask', 'leaf', 'scroll',
 /**
  * Optional starter kits for the New subject sheet. `plan` is a learning-plan template key, `tools` are
  * built-in tools (see hasTool) and `lessons` are built-in lesson ids the caller adds with addBuiltInLesson.
+ * `czech` kits are offered only to Czech accounts and `intl` kits only to all others (see kitsFor).
  */
 export const KITS = [
   { id: 'math', name: 'Mathematics', icon: 'math', color: 'violet', plan: 'math' },
   { id: 'physics', name: 'Physics', icon: 'atom', color: 'orange', plan: 'physics' },
   { id: 'chemistry', name: 'Chemistry', icon: 'flask', color: 'teal', plan: 'research', tools: ['nazvoslovi'] },
-  { id: 'czech', name: 'Czech', icon: 'book', color: 'red', plan: 'literature' },
+  { id: 'czech', name: 'Czech', icon: 'book', color: 'red', plan: 'literature', czech: true },
+  { id: 'language', name: 'Language and literature', icon: 'book', color: 'red', plan: 'research', intl: true },
   { id: 'history', name: 'History', icon: 'scroll', color: 'brown', plan: 'history' },
-  { id: 'zsv', name: 'ZSV', icon: 'scale', color: 'indigo', plan: 'highlights' },
+  { id: 'zsv', name: 'ZSV', icon: 'scale', color: 'indigo', plan: 'highlights', czech: true },
+  { id: 'social', name: 'Social studies', icon: 'scale', color: 'indigo', plan: 'highlights', intl: true },
   { id: 'biology', name: 'Biology', icon: 'leaf', color: 'green', plan: 'research' },
   { id: 'geography', name: 'Geography', icon: 'map', color: 'cyan', plan: 'research' },
   { id: 'informatics', name: 'Computer science', icon: 'code', color: 'pink', plan: 'general', lessons: ['soustavy'] },
 ];
+
+/** Tools and built-in lessons written in Czech or for Czech school rules: Názvosloví and Číselné soustavy. */
+const CZECH_ONLY = new Set(['nazvoslovi', 'soustavy']);
+
+/**
+ * The starter kits for an account: all Czech ones for a Czech school, otherwise the neutral set without
+ * the Czech-only tools and lessons.
+ *
+ * @param {boolean} czech True for an account whose country is the Czech Republic.
+ * @returns {object[]} Entries of KITS, copied when a tool or lesson was taken out.
+ */
+export function kitsFor(czech) {
+  if (czech) return KITS.filter(k => !k.intl);
+  const keep = list => list?.filter(x => !CZECH_ONLY.has(x));
+  return KITS.filter(k => !k.czech).map(k => (k.tools || k.lessons ? { ...k, tools: keep(k.tools), lessons: keep(k.lessons) } : k));
+}
 
 /**
  * Creates a subject, optionally from a starter kit.
@@ -60,7 +79,7 @@ export function subjectFromKit(kit, { name, icon, color, id, now = Date.now() } 
   if (!kit) return subject;
   subject.kit = kit.id;
   subject.plan = { template: kit.plan };
-  if (kit.tools) subject.tools = [...kit.tools];
+  if (kit.tools?.length) subject.tools = [...kit.tools];
   return subject;
 }
 
@@ -118,7 +137,7 @@ export const PRESETS = [
     useNotes: true,
     starter: 'Explain the main idea of my latest notes.',
     kickoff: 'Reply with one short sentence saying you are ready, then wait for my question.',
-    prompt: 'You are a patient tutor for {subject} at a Czech gymnázium (students aged 15 to 16). Explain step by step with simple examples. Keep answers short enough to read on a phone. End with one short question that checks understanding. If the student\'s notes are given, stay consistent with them and point out anything in them that looks wrong.',
+    prompt: 'You are a patient tutor for {subject}. The student is {student}. Explain step by step with simple examples. Keep answers short enough to read on a phone. End with one short question that checks understanding. If the student\'s notes are given, stay consistent with them and point out anything in them that looks wrong.',
   },
   {
     id: 'quiz',

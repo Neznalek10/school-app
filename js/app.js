@@ -17,6 +17,7 @@ import { notesView } from './views/notes.js';
 import { chatView } from './views/chat.js';
 import { accountView } from './views/account.js';
 import { tasksView, taskView } from './views/tasks.js';
+import { calendarView } from './views/calendar.js';
 import { lessonView, newLessonView } from './views/lessons.js';
 import { studyView } from './views/study.js';
 import { promptsView } from './views/prompts.js';
@@ -25,6 +26,8 @@ import { exerciseView } from './views/exercises.js';
 import { setupView } from './views/setup.js';
 import { syncState, onSyncChange, dismissConflictNotice } from './sync/engine.js';
 import { announceUpdate, watchForUpdates } from './update.js';
+import { setLocale, browserLanguage, uiLanguage } from './locale.js';
+import { startTranslating, applyLanguage } from './i18n.js';
 
 const ROUTES = {
   accounts: accountsView,
@@ -34,6 +37,7 @@ const ROUTES = {
   notes: notesView,
   chat: chatView,
   tests: tasksView,
+  calendar: calendarView,
   task: taskView,
   lesson: lessonView,
   newlesson: newLessonView,
@@ -48,6 +52,7 @@ const ROUTES = {
 const TABS = [
   { route: 'home', label: 'Home', icon: 'home' },
   { route: 'tests', label: 'Tests', icon: 'clipboard' },
+  { route: 'calendar', label: 'Calendar', icon: 'calendar' },
   { route: 'notes', label: 'Notes', icon: 'notes' },
   { route: 'account', label: 'Account', icon: 'user' },
 ];
@@ -94,7 +99,13 @@ export const app = {
   },
 
   signIn(id) {
+    const before = uiLanguage();
     if (!store.useAccount(id)) return this.go('accounts', { replace: true });
+    // The shell was drawn in the welcome screen's language; redraw it when the account uses another one.
+    if (uiLanguage() !== before) {
+      renderShell();
+      applyLanguage();
+    }
     applyTheme();
     renderSide();
     const route = location.hash.replace(/^#\/?/, '').split(/[/?]/)[0];
@@ -103,7 +114,12 @@ export const app = {
   },
 
   switchAccount() {
+    const before = uiLanguage();
     store.signOut();
+    if (uiLanguage() !== before) {
+      renderShell();
+      applyLanguage();
+    }
     applyTheme();
     renderSide();
     this.go('accounts');
@@ -277,8 +293,11 @@ function watchConflictNotice() {
 }
 
 function start() {
+  // Before anyone signs in, the welcome screen follows the browser's language.
+  setLocale({ language: browserLanguage() });
   applyTheme();
   renderShell();
+  startTranslating();
   registerServiceWorker();
   watchConflictNotice();
   navigator.storage?.persist?.().catch(() => {});

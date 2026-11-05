@@ -2,15 +2,15 @@
  * Prompts page: every assistant's prompt of a subject, ready to copy into ChatGPT, Gemini or Claude.
  */
 import { store } from '../store.js';
-import { externalPrompt } from '../ai.js';
+import { externalPrompt, languageName } from '../ai.js';
 import { assistantsOf } from '../subjects.js';
 import { TEMPLATES, planOf, promptFor } from '../study.js';
 import { upcoming, typeOf, isTask } from '../events.js';
 import { html, icon } from '../ui.js';
 import { copyText } from './parts.js';
 import { contextNotes, contextLabel } from './chat.js';
+import { formatNumber } from '../locale.js';
 
-const LANGUAGES = { en: 'English', cs: 'Czech' };
 const OPEN = [
   ['ChatGPT', 'https://chatgpt.com/'],
   ['Gemini', 'https://gemini.google.com/app'],
@@ -63,7 +63,7 @@ export function promptsView(app, { id, read, part }) {
     <p class="muted prompts-intro">Paste one into ChatGPT, Gemini or Claude as the first message. ${subject.name}'s notes and upcoming tests are already filled in.</p>
     <section class="card settings">
       <label class="setting prompts-read">
-        <span class="setting-text"><span class="setting-label">What the AI should read</span><span class="setting-hint">Answers in ${LANGUAGES[language] || 'English'} (change in Account)</span></span>
+        <span class="setting-text"><span class="setting-label">What the AI should read</span><span class="setting-hint">Answers in ${languageName(language)} (change in Account)</span></span>
         <select class="input" name="read">${choices.map(c => html`<option value="${c.value}" ${c.value === context ? 'selected' : ''}>${c.label}</option>`)}</select>
       </label>
     </section>
@@ -76,7 +76,7 @@ export function promptsView(app, { id, read, part }) {
         <button class="btn btn-primary" data-copy-prompt="${i}">${icon('copy')}Copy</button>
         ${OPEN.map(([label, url]) => html`<a class="btn btn-secondary btn-sm" href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`)}
       </div>
-      <details class="help" ${c.key === active ? 'open' : ''}><summary>${icon('eye')}See the prompt · ${c.text.length.toLocaleString('en-US')} characters</summary><pre class="prompt-preview">${c.text}</pre></details>
+      <details class="help" ${c.key === active ? 'open' : ''}><summary>${icon('eye')}See the prompt · ${formatNumber(c.text.length)} characters</summary><pre class="prompt-preview">${c.text}</pre></details>
     </section>`)}`;
 
   return {

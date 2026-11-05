@@ -1,3 +1,5 @@
+import { formatDate, weekStart } from './locale.js';
+
 // Calendar dates are local "YYYY-MM-DD" strings, so a test on the 3rd stays on the 3rd in any timezone.
 export const EVENT_TYPES = [
   { key: 'test', label: 'Test', icon: 'target' },
@@ -62,13 +64,15 @@ export function whenLabel(key, today = dayKey()) {
   return n > 0 ? `In ${n} days` : `${-n} days ago`;
 }
 
-export const formatDay = (key, opts = { weekday: 'short', day: 'numeric', month: 'short' }) => parseDay(key).toLocaleDateString('en-GB', opts);
-export const formatMonth = key => parseDay(key).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+export const formatDay = (key, opts = { weekday: 'short', day: 'numeric', month: 'short' }) => formatDate(parseDay(key), opts);
+export const formatMonth = key => formatDate(parseDay(key), { month: 'long', year: 'numeric' });
+// The short month under a day number in event rows, for example "Nov" or "lis".
+export const shortMonth = key => formatDate(parseDay(key), { month: 'short' }).replace(/\.$/, '');
 
-// Weeks start on Monday, as in Czech school calendars. Always six rows so the grid doesn't jump between months.
-export function monthGrid(key) {
+// Weeks start on the country's first day (Monday in most of Europe). Always six rows so the grid doesn't jump between months.
+export function monthGrid(key, firstWeekday = weekStart()) {
   const first = parseDay(key);
-  const offset = (first.getDay() + 6) % 7;
+  const offset = (first.getDay() - firstWeekday + 7) % 7;
   const start = new Date(first.getFullYear(), first.getMonth(), 1 - offset);
   const month = first.getMonth();
   return Array.from({ length: 6 }, (_, w) => Array.from({ length: 7 }, (_, i) => {

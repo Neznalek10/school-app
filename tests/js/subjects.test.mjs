@@ -9,7 +9,7 @@ import { test, assert } from './harness.mjs';
 import { TEMPLATES } from '../../js/study.js';
 import { SETUP_ID, SETUP_TOOLS, SETUP_LESSONS, applySetup } from '../../js/setup.js';
 import {
-  KITS, COLORS, SUBJECT_ICONS, PRESETS, LATER_DEFAULTS, LEGACY_TOOLS,
+  KITS, kitsFor, COLORS, SUBJECT_ICONS, PRESETS, LATER_DEFAULTS, LEGACY_TOOLS,
   defaultSubjects, subjectFromKit, hasTool, assistantsOf, addLaterDefaults,
 } from '../../js/subjects.js';
 import { addBuiltInLesson } from '../../js/soustavy.js';
@@ -36,9 +36,9 @@ test('createAccount records addedDefaults and useAccount loads one subject', () 
   assert.equal(store.lessons.length, 0);
 });
 
-test('there are nine kits with unique ids, and each kit points at a real template, icon and colour', () => {
-  assert.equal(KITS.length, 9);
-  assert.equal(new Set(KITS.map(k => k.id)).size, 9);
+test('there are eleven kits with unique ids, and each kit points at a real template, icon and colour', () => {
+  assert.equal(KITS.length, 11);
+  assert.equal(new Set(KITS.map(k => k.id)).size, 11);
   for (const kit of KITS) {
     assert.ok(Object.hasOwn(TEMPLATES, kit.plan), `plan of ${kit.id}`);
     assert.ok(SUBJECT_ICONS.includes(kit.icon), `icon of ${kit.id}`);
@@ -53,6 +53,18 @@ test('kits carry the tools and lessons from AC2', () => {
   assert.deepEqual(byId.chemistry.tools, ['nazvoslovi']);
   assert.deepEqual(byId.informatics.lessons, ['soustavy']);
   assert.equal(byId.math.tools, undefined);
+});
+
+test('kitsFor offers the Czech kits to Czech accounts and neutral ones without Czech tools to others', () => {
+  const czech = kitsFor(true).map(k => k.id);
+  assert.equal(czech.length, 9);
+  assert.ok(czech.includes('czech') && czech.includes('zsv') && !czech.includes('social'));
+  const intl = Object.fromEntries(kitsFor(false).map(k => [k.id, k]));
+  assert.equal(Object.keys(intl).length, 9);
+  assert.ok(intl.language && intl.social && !intl.czech && !intl.zsv);
+  assert.deepEqual(intl.chemistry.tools, []);
+  assert.deepEqual(intl.informatics.lessons, []);
+  assert.equal(subjectFromKit(intl.chemistry, { name: 'Chemistry', icon: 'flask', color: 'teal', id: 's2' }).tools, undefined);
 });
 
 test('subjectFromKit with a kit prefills plan, kit id and tools', () => {

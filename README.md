@@ -2,7 +2,7 @@
 
 A study hub for one student: your subjects, notes, tests and homework, AI assistants that know how your class works, and practice apps for languages, chemistry naming and maths. Everything runs on your own computer. Your progress is saved in one readable file that you can back up or move to another computer with git.
 
-It was built for a Czech secondary school (gymnázium). The interface is in English. Some tools and prompts are Czech-specific: the Czech chemistry naming trainer (Názvosloví), the Czech literature plan, the ZSV plan and the MŠMT school-year calendar. Everything else works for any school.
+It works for any school in any country. The interface is in English or Czech, the AI assistants answer in any of 32 languages, and dates, weeks and holidays follow your country. It started at a Czech secondary school (gymnázium), so Czech accounts also get Czech-only extras: the chemistry naming trainer (Názvosloví), the Czech and ZSV starter kits, Czech maths and physics conventions in the lesson prompts, and the MŠMT school-year calendar. Other countries get neutral kits and prompts instead.
 
 ## Contents
 
@@ -19,12 +19,13 @@ It was built for a Czech secondary school (gymnázium). The interface is in Engl
 
 ## What it does
 
-**Subjects you build yourself.** A new account starts with one subject, Languages, which opens a French course and an English vocabulary trainer. You add the rest. The New subject sheet offers optional starter kits (Mathematics, Physics, Chemistry, Czech, History, ZSV, Biology, Geography, Computer science) that fill in the icon, colour, study plan and built-in tools. You can also start from an empty subject.
+**Subjects you build yourself.** A new account starts with one subject, Languages, which opens a French course and an English vocabulary trainer. You add the rest. The New subject sheet offers optional starter kits (Mathematics, Physics, Chemistry, History, Biology, Geography, Computer science, plus Czech and ZSV for Czech accounts or Language and literature and Social studies for everyone else) that fill in the icon, colour, study plan and built-in tools. You can also start from an empty subject.
 
 **An AI interview that personalises each subject.** Every subject has a "Set up this subject" assistant. It asks one question at a time: what the course covers, your main sources, what tests look like, how your teacher grades, what you find hard and what you want to reach. It ends with a setup proposal. You check a preview, apply it, and from then on every assistant, prompt and lesson for that subject uses this profile. You can run the interview inside the app or copy it into ChatGPT or Gemini.
 
 **Everything a subject needs, in one page.**
 - **Calendar** with tests, homework and events, plus your country's public holidays, set up for you. The country is picked from your browser's language (for example Czech gives the Czech Republic, `en-US` the United States) and can be changed in Account › Calendar. About 200 countries are supported. The Czech Republic also gets the MŠMT school breaks, the first and last day of school, your district's spring break and the important days (významné dny).
+- **Calendar tab** with every subject together: a month grid that fits a phone, then every upcoming and every past test, homework and event, filterable by subject.
 - **Tests and homework** table across all subjects, with a page per item for the description, study material and grade.
 - **Notes** in light Markdown, saved automatically.
 - **Sources**: websites, uploaded files (PDF, images, text) and book references.
@@ -36,6 +37,10 @@ It was built for a Czech secondary school (gymnázium). The interface is in Engl
 - English vocabulary trainer for any word list you import (CSV, JSON or pasted text).
 - Názvosloví: 1,382 Czech inorganic compounds and all 118 elements, with theory pages and a periodic table.
 - Číselné soustavy: number system conversions with generated exercises (Computer science kit).
+
+**Nothing typed is lost.** Notes save as you type. Every other form and text box (a new test, source, subject, assistant, lesson paste, chat message, setup answer) keeps a draft when you close it, switch apps on your phone or reload. It shows "Draft restored" with a Discard button, and the draft is removed once you save.
+
+**Made for your country and language.** Account › Appearance sets the interface language (English or Czech, following your browser at first). Account › AI assistants sets the answer language (32 languages) and "Your school and year", which every AI prompt uses to pitch its answers at your level. Account › Calendar sets the country, which decides the holidays, the first day of the week and the date and number formats.
 
 **Works without an AI key.** Every assistant and lesson prompt can be copied as one ready message for ChatGPT, Gemini or Claude, with your notes included.
 

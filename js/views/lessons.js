@@ -8,7 +8,7 @@
  * Invariant: lessons belong to a subject (subjectId); a subject's plan keeps the setup's `extra` text.
  */
 import { store, uid } from '../store.js';
-import { TEMPLATES, planOf, promptFor, parseLesson, lessonCounts, cardsOf, exercisesOf, slideHref, clozeParts, clozeAnswer, unitLabel, templateOf } from '../study.js';
+import { TEMPLATES, templatePrompt, planOf, promptFor, parseLesson, lessonCounts, cardsOf, exercisesOf, slideHref, clozeParts, clozeAnswer, unitLabel, templateOf } from '../study.js';
 import { readHighlights, highlightsText } from '../docx.js';
 import { summarize } from '../srs.js';
 import { markdown } from '../md.js';
@@ -16,6 +16,8 @@ import { html, raw, icon, plural, pct, segmented, onSegmented, emptyState, maste
 import { startStudy } from './study.js';
 import { exercisesPart, mountExercisesPart } from './exercises.js';
 import { copyText } from './parts.js';
+import { bindDraft } from '../drafts.js';
+import { formatDate, formatNumber } from '../locale.js';
 
 export const lessonHref = l => `#/lesson/${encodeURIComponent(l.id)}`;
 export const lessonsOf = subjectId => store.lessons.filter(l => l.subjectId === subjectId).sort((a, b) => b.created - a.created);
@@ -54,23 +56,25 @@ export function planSheet(app, subject) {
     </form>`,
     onMount(body, close) {
       const form = body.querySelector('form');
+      const draft = bindDraft(form, `plan:${subject.id}`);
       onSegmented(body, (name, value) => {
-        const wasDefault = form.prompt.value.trim() === TEMPLATES[template].prompt.trim();
+        const wasDefault = form.prompt.value.trim() === templatePrompt(template).trim();
         template = value;
         body.querySelector('.plan-hint').textContent = TEMPLATES[template].hint;
         body.querySelector('[data-reset]').textContent = `Reset to the ${TEMPLATES[template].label} template`;
-        if (wasDefault) form.prompt.value = TEMPLATES[template].prompt;
+        if (wasDefault) form.prompt.value = templatePrompt(template);
       });
-      body.querySelector('[data-reset]').addEventListener('click', () => { form.prompt.value = TEMPLATES[template].prompt; });
+      body.querySelector('[data-reset]').addEventListener('click', () => { form.prompt.value = templatePrompt(template); });
       form.addEventListener('submit', e => {
         e.preventDefault();
         const prompt = form.prompt.value.trim();
         subject.plan = {
           template,
-          ...(prompt && prompt !== TEMPLATES[template].prompt.trim() ? { prompt } : {}),
+          ...(prompt && prompt !== templatePrompt(template).trim() ? { prompt } : {}),
           ...(extra ? { extra } : {}),
         };
         store.save('subjects');
+        draft.clear();
         close();
         app.toast('Learning plan saved.', { kind: 'success' });
         app.render();
@@ -97,7 +101,7 @@ export function lessonsPanel(app, subject) {
         return html`<a class="note-row lesson-row" href="${lessonHref(l)}">
           <span class="assistant-icon">${icon('learn')}</span>
           <span class="note-row-main"><strong>${l.title}</strong>
-            <small>${new Date(l.created).toLocaleDateString('en-GB', DAY_FMT)}${l.data.exercises?.length ? ` · ${plural(l.data.exercises.length, 'exercise')}` : ''} · ${plural(s.total, 'card')} · ${pct(s.levels.mastered, s.total)}% mastered${s.due ? ` · ${s.due} due` : ''}</small>
+            <small>${formatDate(l.created, DAY_FMT)}${l.data.exercises?.length ? ` · ${plural(l.data.exercises.length, 'exercise')}` : ''} · ${plural(s.total, 'card')} · ${pct(s.levels.mastered, s.total)}% mastered${s.due ? ` · ${s.due} due` : ''}</small>
             ${masteryBar(s.levels, { thin: true })}</span>
           ${icon('chevronRight', 'chevron')}
         </a>`;
@@ -114,7 +118,7 @@ function highlightResult(h) {
   if (!h.passages) {
     return html`<div class="notice notice-warn">${icon('alert')}<span>No yellow highlighting found in ${h.fileName}. The parts must be highlighted in yellow (Word's highlighter or Google Docs' highlight colour), not just coloured text.</span></div>`;
   }
-  return html`<div class="notice notice-good">${icon('check')}<span><strong>${plural(h.passages, 'highlighted passage')}</strong> from ${h.fileName}${h.sections > 1 ? ` · ${plural(h.sections, 'heading')}` : ''} · ${h.chars.toLocaleString('en-US')} characters. They are now inside the prompt.</span></div>
+  return html`<div class="notice notice-good">${icon('check')}<span><strong>${plural(h.passages, 'highlighted passage')}</strong> from ${h.fileName}${h.sections > 1 ? ` · ${plural(h.sections, 'heading')}` : ''} · ${formatNumber(h.chars)} characters. They are now inside the prompt.</span></div>
     <details class="help"><summary>${icon('eye')}See what was found</summary><pre class="prompt-preview">${h.text}</pre></details>`;
 }
 
@@ -236,6 +240,8 @@ export function newLessonView(app, { id, lesson: replaceId }) {
         showDocSteps();
       });
       $('[data-plan]').addEventListener('click', () => planSheet(app, subject));
+      // Bound after the listeners above, so a restored draft also fills `draft` and the preview.
+      const saved = bindDraft(root, `newlesson:${draftKey}`);
       update();
       $('[data-create]').addEventListener('click', () => {
         const link = /^https?:\/\//i.test(draft.link.trim()) ? draft.link.trim() : '';
@@ -249,6 +255,7 @@ export function newLessonView(app, { id, lesson: replaceId }) {
         }
         store.save('lessons');
         delete app.ui.lessonDraft[draftKey];
+        saved.clear();
         const exercises = exercisesOf(lesson).length;
         app.toast(existing ? 'Lesson updated.' : `Lesson created with ${exercises ? `${plural(exercises, 'exercise')} and ` : ''}${plural(cardsOf(lesson).length, 'flashcard')}.`, { kind: 'success' });
         app.go(`lesson/${encodeURIComponent(lesson.id)}`, { replace: true });

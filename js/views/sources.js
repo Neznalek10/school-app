@@ -5,6 +5,7 @@
 import { store, uid } from '../store.js';
 import { putFile, getFile, deleteFile, fileSize, MAX_FILE_BYTES } from '../files.js';
 import { html, icon, plural, segmented, onSegmented, emptyState } from '../ui.js';
+import { bindDraft } from '../drafts.js';
 
 export const SOURCE_KINDS = [
   { key: 'link', label: 'Website', plural: 'Websites', icon: 'link' },
@@ -91,6 +92,7 @@ export function sourceSheet(app, subject, source = null, { onSave } = {}) {
     </form>`,
     onMount(body, close) {
       const form = body.querySelector('form');
+      const draft = bindDraft(form, `source:${source?.id || `new:${subject.id}`}`);
       const error = body.querySelector('.form-error');
       const fail = text => {
         error.textContent = text;
@@ -134,6 +136,7 @@ export function sourceSheet(app, subject, source = null, { onSave } = {}) {
           : { id: uid('r'), subjectId: subject.id, kind, ...fields, added: Date.now() };
         if (!source) store.sources.push(saved);
         store.save('sources');
+        draft.clear();
         onSave?.(saved);
         close();
         app.render();

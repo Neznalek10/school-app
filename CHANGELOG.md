@@ -4,6 +4,20 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 The 1.x history lived in the earlier project (school-learning-app). This file starts at 2.0.0.
 
+## [2.4.0] - 2026-11-06
+
+### Added
+
+- A Calendar tab with every subject together: a month grid that fits a phone, every upcoming and every past item, subject chips to show one subject, and holidays.
+- Drafts everywhere: a new test, source, subject, assistant, learning plan, lesson paste, chat message or setup answer is kept when the form is closed, the app is switched away from or the page reloads. "Draft restored" with Discard shows when one comes back.
+- Interface language: English or Czech (Account › Appearance), following the browser for new accounts. The Czech texts live in `js/i18n/cs.js`; more languages can be added as one file each.
+- The assistants answer in any of 32 languages, and "Your school and year" tells every AI prompt who the student is.
+
+### Changed
+
+- Dates, the first day of the week and numbers follow the account's language and country instead of fixed British English.
+- Outside the Czech Republic, prompts describe the student by country and use neutral school conventions, and the starter kits swap Czech and ZSV for Language and literature and Social studies, without the Czech-only Názvosloví and number-systems lesson. Czech accounts keep everything as before.
+
 ## [2.3.0] - 2026-11-05
 
 ### Added

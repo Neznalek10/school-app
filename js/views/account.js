@@ -8,13 +8,15 @@
  * Invariant: the AI key is never shown in or sent to the data file; in file mode it lives in .env.
  */
 import { store } from '../store.js';
-import { DEFAULT_AI, chat, aiReady, aiSettings, AiError } from '../ai.js';
+import { DEFAULT_AI, chat, aiReady, aiSettings, AiError, AI_LANGUAGES, languageName } from '../ai.js';
 import { html, icon, plural, segmented, onSegmented, applyTheme } from '../ui.js';
 import { avatar } from './accounts.js';
 import { downloadBackup, pickBackupFile } from './backup-ui.js';
 import { DISTRICTS, SCHOOL_YEAR_RANGE } from '../czech.js';
 import { COUNTRIES, CZECH, countryName } from '../holidays.js';
 import { syncState, onSyncChange, syncNow, forgetKey } from '../sync/engine.js';
+import { formatDateTime, studentText, MAX_SCHOOL, UI_LANGUAGES, uiLanguage } from '../locale.js';
+import { tr } from '../i18n.js';
 
 /** Shown for the browser-only storage mode. */
 const BROWSER_STORAGE_TEXT = html`Saved in this browser only. Start the app with <code>python serve.py</code> to keep it in a file you can move to another computer.`;
@@ -77,7 +79,7 @@ function storageStatus(state) {
 function storageCardBody(state) {
   const { tone, text, alert } = storageStatus(state);
   const isFile = state.mode === 'file';
-  const savedAt = state.savedAt ? new Date(state.savedAt).toLocaleString() : 'not yet';
+  const savedAt = state.savedAt ? formatDateTime(state.savedAt) : 'not yet';
   // The pill sits outside the key/value rows so its text flows and stays left-aligned.
   return html`
     <div class="storage-status ${tone}" role="${alert ? 'alert' : 'status'}">${icon(tone === 'is-good' ? 'check' : tone ? 'alert' : 'refresh')}<span>${text}</span></div>
@@ -108,7 +110,7 @@ function keyNote(state) {
 export function accountView(app) {
   let stopSyncListening = () => {};
   const s = store.settings;
-  const countries = COUNTRIES.map(code => [code, countryName(code)]).sort((a, b) => a[1].localeCompare(b[1], 'en'));
+  const countries = COUNTRIES.map(code => [code, countryName(code)]).sort((a, b) => a[1].localeCompare(b[1], uiLanguage()));
   const ai = aiSettings();
   const chats = Object.values(store.chats).filter(c => c.messages?.length).length;
 
@@ -137,18 +139,23 @@ export function accountView(app) {
         <button class="btn btn-secondary btn-sm" data-ai-preset="ollama">Ollama on this PC</button>
         <button class="btn btn-primary btn-sm" data-ai-test>${icon('check')}Test</button>
       </div>
-      ${row('Answer language', 'The assistants reply in this language', segmented('aiLanguage', [
-        { value: 'en', label: 'English' },
-        { value: 'cs', label: 'Czech' },
-      ], s.aiLanguage))}
+      <div class="setting">
+        <div class="setting-text"><div class="setting-label">Answer language</div><div class="setting-hint">The assistants and the setup interview reply in this language</div></div>
+        <select class="input district-select" name="aiLanguage" aria-label="Answer language" data-no-tr>
+          ${AI_LANGUAGES.map(code => html`<option value="${code}" ${code === s.aiLanguage ? 'selected' : ''}>${languageName(code, code)} · ${languageName(code)}</option>`)}
+        </select>
+      </div>
+      <label class="field-label" for="ai-school">Your school and year</label>
+      <input id="ai-school" class="input" name="school" data-no-tr maxlength="${MAX_SCHOOL}" value="${s.school || ''}" placeholder="${studentText()}" autocomplete="off">
+      <p class="muted small">The assistants and lesson prompts use this to pitch their answers at your level. Leave it empty to use the text shown, which follows your country.</p>
     </section>
 
     <h3 class="group-title" id="calendar">Calendar</h3>
     <section class="card settings">
       <div class="setting">
         <div class="setting-text"><div class="setting-label">Country</div><div class="setting-hint">${s.country === CZECH ? 'Czech Republic has the full school calendar built in.' : 'Public holidays come from Nager.Date and are saved on this device for offline use.'}</div></div>
-        <select class="input district-select" name="country" aria-label="Country">
-          <option value="" ${s.country ? '' : 'selected'}>None</option>
+        <select class="input district-select" name="country" aria-label="Country" data-no-tr>
+          <option value="" ${s.country ? '' : 'selected'}>${tr('None')}</option>
           ${countries.map(([code, name]) => html`<option value="${code}" ${code === s.country ? 'selected' : ''}>${name}</option>`)}
         </select>
       </div>
@@ -157,8 +164,8 @@ export function accountView(app) {
       ${row('Important days', 'Významné dny, e.g. Flag Day or Teachers\' Day', segmented('cz-important', [{ value: 'on', label: 'Show' }, { value: 'off', label: 'Hide' }], s.czech.important ? 'on' : 'off'))}
       <div class="setting">
         <div class="setting-text"><div class="setting-label">Spring break district</div><div class="setting-hint">Spring break depends on the district your school is in. School breaks are filled in for ${SCHOOL_YEAR_RANGE[0]}/${String(SCHOOL_YEAR_RANGE[0] + 1).slice(2)} to ${SCHOOL_YEAR_RANGE[1]}/${String(SCHOOL_YEAR_RANGE[1] + 1).slice(2)}.</div></div>
-        <select class="input district-select" name="district" aria-label="Spring break district">
-          <option value="">Not set</option>
+        <select class="input district-select" name="district" aria-label="Spring break district" data-no-tr>
+          <option value="">${tr('Not set')}</option>
           ${DISTRICTS.map(d => html`<option value="${d}" ${d === s.czech.district ? 'selected' : ''}>${d}</option>`)}
         </select>
       </div>` : ''}
@@ -166,6 +173,12 @@ export function accountView(app) {
 
     <h3 class="group-title">Appearance</h3>
     <section class="card settings">
+      <div class="setting">
+        <div class="setting-text"><div class="setting-label">Interface language</div><div class="setting-hint">Menus, buttons and messages. Your own notes and subjects stay as you wrote them.</div></div>
+        <select class="input district-select" name="uiLanguage" aria-label="Interface language" data-no-tr>
+          ${UI_LANGUAGES.map(l => html`<option value="${l.code}" ${l.code === s.uiLanguage ? 'selected' : ''}>${l.name}</option>`)}
+        </select>
+      </div>
       ${row('Theme', null, segmented('theme', [
         { value: 'system', label: 'System' },
         { value: 'light', label: 'Light' },
@@ -245,6 +258,22 @@ export function accountView(app) {
         else s[name] = value;
         store.save('settings');
         if (name === 'theme') applyTheme();
+      });
+      root.querySelector('[name=uiLanguage]').addEventListener('change', e => {
+        s.uiLanguage = UI_LANGUAGES.some(l => l.code === e.target.value) ? e.target.value : 'en';
+        store.save('settings');
+        // Every screen was drawn in the old language, so the page starts again in the new one.
+        location.reload();
+      });
+      root.querySelector('[name=school]').addEventListener('change', e => {
+        s.school = e.target.value.trim().replace(/\s+/g, ' ').slice(0, MAX_SCHOOL);
+        store.save('settings');
+        app.toast('School saved.', { kind: 'success' });
+      });
+      root.querySelector('[name=aiLanguage]').addEventListener('change', e => {
+        s.aiLanguage = AI_LANGUAGES.includes(e.target.value) ? e.target.value : 'en';
+        store.save('settings');
+        app.toast(`Assistants now answer in ${languageName(s.aiLanguage)}.`, { kind: 'success' });
       });
       root.querySelector('[name=country]').addEventListener('change', e => {
         s.country = COUNTRIES.includes(e.target.value) ? e.target.value : '';
