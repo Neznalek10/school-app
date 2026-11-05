@@ -4,6 +4,12 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 The 1.x history lived in the earlier project (school-learning-app). This file starts at 2.0.0.
 
+## [2.2.0] - 2026-11-05
+
+### Changed
+
+- The French app is now the full language app, version 2.1.0, instead of the older 1.16.0 copy. New in it: learn from Czech or English (Settings › I speak), the whole interface in Czech, more lessons and fixes, and an optional save folder. Your French progress carries over, and it still signs in with your school account and saves into the same data file.
+
 ## [2.1.1] - 2026-11-05
 
 ### Changed

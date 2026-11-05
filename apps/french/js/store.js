@@ -1,16 +1,10 @@
-/**
- * Browser storage for the French app: profiles and everything each profile owns (progress, settings, texts).
- *
- * Used by app.js and every view; uses only localStorage (with an in-memory fallback). Invariants: keys
- * use their own prefix so this copy never shares data with the standalone French app, and every profile's
- * settings hold an `ai` block so the key from .env can be filled in by the dashboard sync.
- */
-// Its own prefix, so this copy never shares data with the standalone French app on the same site.
+// Its own prefix, so this copy never shares data with the standalone language app on the same site.
 const PREFIX = 'school-fr.';
 const memory = {};
 
-const DEFAULT_AI = { url: 'https://openrouter.ai/api/v1', key: '', model: 'openrouter/free' };
+// Profiles from before the language choice were all Czech, so a missing "base" means Czech.
 const DEFAULT_SETTINGS = {
+  base: 'cs',
   direction: 'forward',
   strictAccents: false,
   sessionLength: 10,
@@ -24,7 +18,7 @@ const DEFAULT_SETTINGS = {
   genLevel: 'A1',
   lastBackup: null,
   drill: { level: 'all', count: 10, mode: 'smart', hint: false },
-  ai: { ...DEFAULT_AI },
+  ai: { url: 'https://openrouter.ai/api/v1', key: '', model: 'openrouter/free' },
   write: { length: 'medium', strict: 'normal', feedback: 'en', hints: true },
   speak: { level: 'A1', minutes: 10, fix: 'end', feedback: 'en', speed: 'slow', free: 'talk' },
 };
@@ -70,15 +64,10 @@ function adoptUnownedData(id) {
 // Per topic: the unsent draft, every score, and the latest text with its result. Plus the topics the AI made and the free chat in progress.
 const emptyWrite = () => ({ topics: {}, custom: { write: [], speak: [] }, chat: null, mistakes: [], spoken: [] });
 
-/**
- * Makes sure a profile's saved settings hold an `ai` block, so a key from .env has an object to be filled into.
- *
- * @param {string} id Profile id.
- * @returns {void}
- */
+// An `ai` block must exist in every profile so the dashboard sync has somewhere to fill in the key from .env.
 function ensureAiSettings(id) {
   const settings = read(`${id}.settings`, {});
-  if (!settings.ai) write(`${id}.settings`, { ...settings, ai: { ...DEFAULT_AI } });
+  if (!settings.ai) write(`${id}.settings`, { ...settings, ai: { ...DEFAULT_SETTINGS.ai } });
 }
 
 export const store = {
@@ -94,24 +83,24 @@ export const store = {
   settings: { ...DEFAULT_SETTINGS },
   lang: null,
 
-  /**
-   * Adds a profile and gives it default AI settings (the first profile also adopts data saved before profiles existed).
-   *
-   * @param {string} name Profile name.
-   * @param {string} [id] Profile id; generated when omitted.
-   * @returns {{id: string, name: string, created: number}} The new profile.
-   */
-  createAccount(name, id = `a${Date.now().toString(36)}`) {
+  onSave: null,
+
+  createAccount(name, base, id = `a${Date.now().toString(36)}`) {
     const account = { id, name, created: Date.now() };
     if (!this.accounts.length) adoptUnownedData(account.id);
+    if (base && read(`${account.id}.settings`, undefined) === undefined) write(`${account.id}.settings`, { base });
     this.accounts.push(account);
     write('accounts', this.accounts);
     ensureAiSettings(account.id);
+    this.onSave?.(account.id);
     return account;
   },
   // The school dashboard opens the app as one of its own accounts; the matching profile is made on first visit.
-  ensureAccount(id, name) {
-    return this.accounts.find(a => a.id === id) || this.createAccount(name, id);
+  ensureAccount(id, name, base) {
+    return this.accounts.find(a => a.id === id) || this.createAccount(name, base, id);
+  },
+  baseOf(id) {
+    return read(`${id}.settings`, {}).base || DEFAULT_SETTINGS.base;
   },
   nameTaken(name) {
     return this.accounts.some(a => a.name.toLowerCase() === name.toLowerCase());
@@ -129,21 +118,18 @@ export const store = {
     this.settings = { ...DEFAULT_SETTINGS, ...read(key('settings'), {}) };
     this.lang = read(key('lang'), null);
   },
-  /**
-   * Restores a backup as a new profile; nothing that already exists is overwritten.
-   * The file never carries `ai`, so the restored profile starts with the default AI settings unless the caller supplied its own.
-   *
-   * @param {string} name Profile name.
-   * @param {object} data Cleaned backup data from parseBackup.
-   * @returns {{id: string, name: string, created: number}} The new profile.
-   */
-  restoreAccount(name, data) {
-    const account = this.createAccount(name);
+  // A backup always becomes a new profile, so nothing that already exists is overwritten.
+  restoreAccount(name, data, id) {
+    const account = this.createAccount(name, undefined, id);
     for (const key of ACCOUNT_KEYS) {
       if (data[key] !== undefined) write(`${account.id}.${key}`, data[key]);
     }
     ensureAiSettings(account.id);
+    this.onSave?.(account.id);
     return account;
+  },
+  dataOf(id) {
+    return Object.fromEntries(ACCOUNT_KEYS.map(k => [k, read(`${id}.${k}`, undefined)]));
   },
   signOut() {
     this.account = null;
@@ -151,6 +137,7 @@ export const store = {
   },
   save(key) {
     write(`${this.account.id}.${key}`, this[key]);
+    this.onSave?.(this.account.id);
   },
 };
 

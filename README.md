@@ -32,7 +32,7 @@ It was built for a Czech secondary school (gymnázium). The interface is in Engl
 - **AI assistants**: Tutor, Quiz me, Study sheet, Research and Check my work, plus your own. Each one can read all your notes for the subject, one note, or none.
 
 **Practice apps.**
-- French course with lessons, vocabulary and conjugation drills.
+- French course with lessons, vocabulary and conjugation drills, in Czech or English (Settings › I speak).
 - English vocabulary trainer for any word list you import (CSV, JSON or pasted text).
 - Názvosloví: 1,382 Czech inorganic compounds and all 118 elements, with theory pages and a periodic table.
 - Číselné soustavy: number system conversions with generated exercises (Computer science kit).

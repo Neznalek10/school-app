@@ -1,13 +1,6 @@
-/**
- * AI client of the French app: settings helpers, the chat call and parsing of the AI's checking answers.
- *
- * Used by the writing, speaking and settings views; uses store.js and learn/writing.js.
- * Invariants: the key goes only to https or local addresses, and provider text shown to the student is
- * key-masked. isKeySafeUrl and maskKeys are deliberate copies of the dashboard rules in js/ai.js: the
- * apps are standalone forks that must not import from the dashboard.
- */
 import { store } from './store.js';
 import { requirementsOf } from './learn/writing.js';
+import { promptUrl } from './data.js';
 
 export const DEFAULT_AI = { url: 'https://openrouter.ai/api/v1', key: '', model: 'openrouter/free' };
 export const aiSettings = () => ({ ...DEFAULT_AI, ...store.settings.ai });
@@ -41,51 +34,29 @@ export const wordCount = text => (String(text).match(/[\p{L}\p{N}]+(?:['’-][\p
 
 const prompts = {};
 export async function loadPrompt(name = 'check-write') {
-  if (prompts[name]) return prompts[name];
-  const res = await fetch(`./prompts/${name}.md`, { cache: 'no-cache' });
+  const url = promptUrl(name);
+  if (prompts[url]) return prompts[url];
+  const res = await fetch(url, { cache: 'no-cache' });
   if (!res.ok) throw new AiError('format', `Could not load the AI instructions (HTTP ${res.status}).`);
-  prompts[name] = await res.text();
-  return prompts[name];
+  prompts[url] = await res.text();
+  return prompts[url];
 }
 
-/** Addresses the key may be sent to: https, or http on this computer (local models such as Ollama). */
+// Addresses the key may be sent to: https, or http on this computer (local models such as Ollama).
 const KEY_SAFE_URL = /^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?([/?#]|$))/i;
-
-/**
- * Tells whether the AI key may be sent to an address.
- *
- * @param {string} url The AI address from settings.
- * @returns {boolean} true for https, or http on localhost / 127.0.0.1.
- */
 export const isKeySafeUrl = url => KEY_SAFE_URL.test(String(url).trim());
 
-/** Strings that look like provider keys, for example sk-or-v1-abc. */
+// Strings that look like provider keys (sk-or-v1-abc), and the shortest configured key masked by exact match.
 const KEY_LIKE = /\bsk-[\w-]+/g;
-/** Shortest configured key that is masked by exact match; shorter ones would hide ordinary words. */
 const MIN_SECRET_LENGTH = 6;
 
-/**
- * Hides keys in text that will be shown to the student.
- *
- * @param {unknown} text Text from a provider (error body or message).
- * @param {string} [secret] The configured AI key; replaced wherever it appears when it has 6 or more characters.
- * @returns {string} The text with `sk-...` strings and the exact key replaced by `sk-***`.
- */
+// Hides keys in provider text before it is shown to the student.
 export function maskKeys(text, secret = '') {
   const masked = String(text).replace(KEY_LIKE, 'sk-***');
   return typeof secret === 'string' && secret.length >= MIN_SECRET_LENGTH ? masked.replaceAll(secret, () => 'sk-***') : masked;
 }
 
-/**
- * One OpenAI-compatible call: works with OpenRouter, Ollama and LM Studio.
- * The key is sent only to safe addresses (isKeySafeUrl) and is masked in any provider text shown back.
- *
- * @param {{url: string, key?: string, model: string}} ai AI settings.
- * @param {{role: string, content: string}[]} messages The conversation, system message first.
- * @param {{timeout?: number, fetcher?: typeof fetch}} [options] `timeout` in ms; `fetcher` replaces fetch in tests.
- * @returns {Promise<string>} The answer text.
- * @throws {AiError} Kind network, auth, limit, http or format.
- */
+// One OpenAI-compatible call: works with OpenRouter, Ollama and LM Studio. The key goes only to safe addresses.
 export async function chat(ai, messages, { timeout = TIMEOUT_MS, fetcher = fetch } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
@@ -109,21 +80,13 @@ export async function chat(ai, messages, { timeout = TIMEOUT_MS, fetcher = fetch
   return text;
 }
 
-/**
- * Turns an HTTP error status into an AiError the student can act on.
- *
- * @param {number} status HTTP status code.
- * @param {string} [body] Response body; a short, key-masked excerpt is shown for unknown errors.
- * @param {string} [secret] The configured AI key, masked in the excerpt.
- * @returns {AiError} Kind auth, limit or http.
- */
 export function httpError(status, body = '', secret = '') {
   if (status === 401 || status === 403) return new AiError('auth', 'The AI refused the key. Check it in Settings.');
   if (status === 402) return new AiError('limit', 'This model needs credit on your OpenRouter account. Pick a free model in Settings.');
   if (status === 404) return new AiError('http', 'The AI could not find this model. Check the model name in Settings.');
   if (status === 429) return new AiError('limit', 'The AI is busy or your free checks for today are used up. Try again in a minute, or change the model in Settings.');
   // Mask first, then cut, so a key cut in half by the limit can't slip through.
-  const detail = maskKeys(String(body).replace(/\s+/g, ' '), secret).slice(0, 140);
+  const detail = maskKeys(body, secret).replace(/\s+/g, ' ').slice(0, 140);
   return new AiError('http', `The AI answered with an error (${status}).${detail ? ` ${detail}` : ''}`);
 }
 
