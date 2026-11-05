@@ -20,6 +20,7 @@ The 1.x history lived in the earlier project (school-learning-app). This file st
 - The subject profile in every assistant's system prompt, in the copy-paste prompts and in the lesson prompt.
 - A "Set up with AI" card on a new subject's page, which becomes a "Profile and setup" row once the subject is set up.
 - A built-in lesson for Computer science (Číselné soustavy), added with its kit or a setup, once per subject.
+- A desktop shortcut: `launcher.py --install` adds "School app" to the app menu and the Desktop. A click starts the server in the background and opens the app, and the shortcut's "Stop the server" action stops it.
 - `tools/test.sh`, which runs the Python and JavaScript test suites.
 - `tools/make-public.sh`, which builds a `public` branch and a public folder without data or personal information.
 - A GitHub Actions workflow for the public copy that runs the tests on each push and pull request.

@@ -57,6 +57,25 @@ Data file: <project folder>/data/school-data.json
 
 Open http://127.0.0.1:8767/ in your browser. Press Ctrl+C in the terminal to stop the server.
 
+### Open it like an app (no terminal)
+
+Install the shortcut once:
+
+```bash
+venv/bin/python launcher.py --install
+```
+
+"School app" then appears in the app menu and on the Desktop. Clicking it starts the server in the background (if it isn't running yet) and opens the app. In Chrome, Chromium, Brave or Edge it opens as its own window. In Firefox it opens a normal browser window, because Firefox has no app-window mode. To stop the server, right-click the shortcut and choose **Stop the server**, or run `venv/bin/python launcher.py --stop`. The server's log is in `~/.local/state/school-app/server.log`.
+
+| Command | What it does |
+|---|---|
+| `venv/bin/python launcher.py` | Start the server if needed and open the app |
+| `venv/bin/python launcher.py --stop` | Stop a server the launcher started |
+| `venv/bin/python launcher.py --install [--no-desktop]` | Add the shortcut to the app menu (and the Desktop) |
+| `venv/bin/python launcher.py --uninstall` | Remove the shortcuts |
+
+Set `SCHOOL_APP_BROWSER` to choose the browser, for example `SCHOOL_APP_BROWSER="firefox --new-window"`. The shortcut stores this folder's location, so after moving the folder run `--install` again. On a new machine, install once after creating the venv.
+
 Use `127.0.0.1`, not `localhost`. Browsers keep separate storage for each address, and the old version of the app ran on `127.0.0.1:8767`, so your existing browser data is found there.
 
 ## Usage
@@ -135,6 +154,7 @@ The tests use temporary folders and fake browser objects. They make no network c
 ```
 school-app/
   serve.py              entry point: starts the local server
+  launcher.py           desktop shortcut: starts the server in the background and opens the app
   server/               HTTP routes, request guard, data file, .env file
   js/                   app code (dashboard views, store, AI, prompts, setup)
     sync/               browser sync: engine, snapshot, client, page entry

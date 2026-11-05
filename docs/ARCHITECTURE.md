@@ -34,6 +34,7 @@ Two rules shape everything else:
 
 | File | Responsibility |
 |---|---|
+| `launcher.py` | Desktop launcher. Starts `serve.py` in the background when nothing answers on the port (it recognises its own server by the `Server: school-app` header), opens the app (an app window in Chromium-family browsers), stops a server it started, and writes or removes the `.desktop` shortcut. |
 | `serve.py` | Command-line entry point. Parses options, refuses non-loopback addresses, starts the server, prints the URL and data file path, stops cleanly on Ctrl+C. |
 | `server/app.py` | HTTP layer. The request handler runs the guard checks, routes `/api/...` to `SchoolApi`, and serves static files. `create_server` builds the server. Enforces the 25 MB body limit and the response headers. |
 | `server/guard.py` | Pure request checks: Host header (DNS rebinding defence), Origin and JSON content type for writes, and the static file allowlist, including symlink resolution. |
