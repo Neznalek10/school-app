@@ -4,6 +4,12 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 The 1.x history lived in the earlier project (school-learning-app). This file starts at 2.0.0.
 
+## [2.1.1] - 2026-11-05
+
+### Changed
+
+- The home-screen icon on phones and tablets now matches the desktop icon: Android shows the cap at the same size, and iPhone and iPad get a full square icon instead of one with black corners.
+
 ## [2.1.0] - 2026-11-05
 
 ### Added
