@@ -4,6 +4,12 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 The 1.x history lived in the earlier project (school-learning-app). This file starts at 2.0.0.
 
+## [2.3.0] - 2026-11-05
+
+### Added
+
+- The calendar sets up your country's important days on its own. A new account picks the country from the browser's language, and Account › Calendar has a Country setting. The Czech Republic keeps the full built-in calendar (public holidays, MŠMT school breaks, spring break by district, important days). About 200 other countries get their nationwide public holidays from Nager.Date, downloaded once per year and kept for offline use. Existing accounts stay on the Czech calendar.
+
 ## [2.2.0] - 2026-11-05
 
 ### Changed

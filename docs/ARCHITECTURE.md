@@ -69,6 +69,7 @@ Two rules shape everything else:
 | Path | Responsibility |
 |---|---|
 | `sw.js` (dashboard and apps) | Offline cache. Never caches `/api/`. |
+| `js/holidays.js` | Calendar days by country: the built-in Czech calendar (`js/czech.js`) or public holidays from Nager.Date, cached per year in `school-cache.holidays.*` (not synced). |
 | `js/update.js` | Applies new versions on its own: checks when the app returns to the screen, reloads once (never while typing) and shows "Updated to version X". |
 | `tools/test.sh` | Runs both test suites. |
 | `tools/make-public.sh` | Builds the public branch and the public folder. |
