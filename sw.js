@@ -27,6 +27,7 @@ const CORE = [
   './js/elements.js',
   './js/events.js',
   './js/files.js',
+  './js/holidays.js',
   './js/mathcheck.js',
   './js/md.js',
   './js/nazvoslovi.js',

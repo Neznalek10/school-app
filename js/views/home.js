@@ -7,7 +7,7 @@ import { html, icon, fmt, plural } from '../ui.js';
 import { subjectSheet } from './subject.js';
 import { upcoming, isTask, dayKey } from '../events.js';
 import { eventRow, calendarHref, czRow } from './calendar.js';
-import { czechItems } from '../czech.js';
+import { calendarItems, fetchMissingHolidays } from '../holidays.js';
 
 function languageHero(app) {
   const account = store.account;
@@ -43,7 +43,8 @@ export function homeView(app) {
   // Days off in the next two weeks sit between your own tests, by date; important days stay in the calendar.
   const today = dayKey();
   const inTwoWeeks = dayKey(new Date(Date.now() + 14 * 864e5));
-  const daysOff = czechItems(today, inTwoWeeks, store.settings.czech).filter(i => i.kind !== 'important').slice(0, 3);
+  fetchMissingHolidays(today, inTwoWeeks, store.settings, () => app.render());
+  const daysOff = calendarItems(today, inTwoWeeks, store.settings).filter(i => i.kind !== 'important').slice(0, 3);
   const coming = [...soon.map(ev => ({ date: ev.date, row: eventRow(app, ev, { href: isTask(ev) ? null : calendarHref(app.subject(ev.subjectId), ev.date), showSubject: true }) })),
     ...daysOff.map(i => ({ date: i.start < today ? today : i.start, row: czRow(i, { today }) }))]
     .sort((a, b) => a.date.localeCompare(b.date));

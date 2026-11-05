@@ -13,6 +13,7 @@ import { html, icon, plural, segmented, onSegmented, applyTheme } from '../ui.js
 import { avatar } from './accounts.js';
 import { downloadBackup, pickBackupFile } from './backup-ui.js';
 import { DISTRICTS, SCHOOL_YEAR_RANGE } from '../czech.js';
+import { COUNTRIES, CZECH, countryName } from '../holidays.js';
 import { syncState, onSyncChange, syncNow, forgetKey } from '../sync/engine.js';
 
 /** Shown for the browser-only storage mode. */
@@ -107,6 +108,7 @@ function keyNote(state) {
 export function accountView(app) {
   let stopSyncListening = () => {};
   const s = store.settings;
+  const countries = COUNTRIES.map(code => [code, countryName(code)]).sort((a, b) => a[1].localeCompare(b[1], 'en'));
   const ai = aiSettings();
   const chats = Object.values(store.chats).filter(c => c.messages?.length).length;
 
@@ -143,7 +145,15 @@ export function accountView(app) {
 
     <h3 class="group-title" id="calendar">Calendar</h3>
     <section class="card settings">
-      ${row('Czech holidays and school breaks', 'Public holidays, MŠMT school breaks, first and last day of school', segmented('cz-holidays', [{ value: 'on', label: 'Show' }, { value: 'off', label: 'Hide' }], s.czech.holidays ? 'on' : 'off'))}
+      <div class="setting">
+        <div class="setting-text"><div class="setting-label">Country</div><div class="setting-hint">${s.country === CZECH ? 'Czech Republic has the full school calendar built in.' : 'Public holidays come from Nager.Date and are saved on this device for offline use.'}</div></div>
+        <select class="input district-select" name="country" aria-label="Country">
+          <option value="" ${s.country ? '' : 'selected'}>None</option>
+          ${countries.map(([code, name]) => html`<option value="${code}" ${code === s.country ? 'selected' : ''}>${name}</option>`)}
+        </select>
+      </div>
+      ${s.country && s.country !== CZECH ? row('Public holidays', `Days off in ${countryName(s.country)}`, segmented('cz-holidays', [{ value: 'on', label: 'Show' }, { value: 'off', label: 'Hide' }], s.czech.holidays ? 'on' : 'off')) : ''}
+      ${s.country === CZECH ? html`${row('Czech holidays and school breaks', 'Public holidays, MŠMT school breaks, first and last day of school', segmented('cz-holidays', [{ value: 'on', label: 'Show' }, { value: 'off', label: 'Hide' }], s.czech.holidays ? 'on' : 'off'))}
       ${row('Important days', 'Významné dny, e.g. Flag Day or Teachers\' Day', segmented('cz-important', [{ value: 'on', label: 'Show' }, { value: 'off', label: 'Hide' }], s.czech.important ? 'on' : 'off'))}
       <div class="setting">
         <div class="setting-text"><div class="setting-label">Spring break district</div><div class="setting-hint">Spring break depends on the district your school is in. School breaks are filled in for ${SCHOOL_YEAR_RANGE[0]}/${String(SCHOOL_YEAR_RANGE[0] + 1).slice(2)} to ${SCHOOL_YEAR_RANGE[1]}/${String(SCHOOL_YEAR_RANGE[1] + 1).slice(2)}.</div></div>
@@ -151,7 +161,7 @@ export function accountView(app) {
           <option value="">Not set</option>
           ${DISTRICTS.map(d => html`<option value="${d}" ${d === s.czech.district ? 'selected' : ''}>${d}</option>`)}
         </select>
-      </div>
+      </div>` : ''}
     </section>
 
     <h3 class="group-title">Appearance</h3>
@@ -236,7 +246,13 @@ export function accountView(app) {
         store.save('settings');
         if (name === 'theme') applyTheme();
       });
-      root.querySelector('[name=district]').addEventListener('change', e => {
+      root.querySelector('[name=country]').addEventListener('change', e => {
+        s.country = COUNTRIES.includes(e.target.value) ? e.target.value : '';
+        store.save('settings');
+        app.toast(s.country ? `Calendar set to ${countryName(s.country)}.` : 'Holidays hidden.', { kind: 'success' });
+        app.render();
+      });
+      root.querySelector('[name=district]')?.addEventListener('change', e => {
         s.czech.district = DISTRICTS.includes(e.target.value) ? e.target.value : '';
         store.save('settings');
         app.toast(s.czech.district ? `Spring break set for ${s.czech.district}.` : 'Spring break hidden.', { kind: 'success' });

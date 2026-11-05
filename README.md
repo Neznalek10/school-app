@@ -24,7 +24,7 @@ It was built for a Czech secondary school (gymnázium). The interface is in Engl
 **An AI interview that personalises each subject.** Every subject has a "Set up this subject" assistant. It asks one question at a time: what the course covers, your main sources, what tests look like, how your teacher grades, what you find hard and what you want to reach. It ends with a setup proposal. You check a preview, apply it, and from then on every assistant, prompt and lesson for that subject uses this profile. You can run the interview inside the app or copy it into ChatGPT or Gemini.
 
 **Everything a subject needs, in one page.**
-- **Calendar** with tests, homework and events, plus Czech public holidays, school breaks and important days.
+- **Calendar** with tests, homework and events, plus your country's public holidays, set up for you. The country is picked from your browser's language (for example Czech gives the Czech Republic, `en-US` the United States) and can be changed in Account › Calendar. About 200 countries are supported. The Czech Republic also gets the MŠMT school breaks, the first and last day of school, your district's spring break and the important days (významné dny).
 - **Tests and homework** table across all subjects, with a page per item for the description, study material and grade.
 - **Notes** in light Markdown, saved automatically.
 - **Sources**: websites, uploaded files (PDF, images, text) and book references.
@@ -147,6 +147,7 @@ The shortcut remembers where the folder is. After moving the folder, run `--inst
    - **Use ChatGPT or Gemini**: copy the prompt, paste it into the chat, answer the questions there, and paste the final answer back into the box.
 5. Check the preview and click **Apply**. The subject now has its profile, study plan, tailored assistants and tools.
 6. Add your next test in the subject's Calendar. Assistants see upcoming tests and use them when they help you.
+7. Open Account › Calendar and check the country. In the Czech Republic, also pick your school's district so the spring break shows up.
 
 To change a subject's setup later, open the subject and click **Profile and setup**.
 
@@ -175,10 +176,13 @@ Keep your key private. It is never written to the data file, backups or the repo
 | Changes that lost a conflict | `data/conflicts/` |
 | AI key | `.env` |
 | Uploaded files (PDFs, images) | The browser only (IndexedDB) |
+| Public holidays of countries other than the Czech Republic | The browser only, downloaded again on another device |
 
 The data file is plain, readable JSON. The app saves it within about 1.5 seconds of each change. If two browsers or computers edit at the same time, the newest saved version wins and the other one is kept in `data/conflicts/`, never deleted. The app then shows a message.
 
 Uploaded files are not part of the data file. Keep the originals elsewhere if you want them on another computer.
+
+The Czech calendar is built into the app. For any other country, the app downloads that year's public holidays once from [Nager.Date](https://date.nager.at), a free public holiday service, and keeps them for offline use. The request contains only the country and the year.
 
 ### Backups
 
@@ -238,6 +242,8 @@ Never push `data/` to a public repository: it contains your notes and grades.
 **"The stored data file is damaged".** `data/school-data.json` is not valid JSON, most often because a git merge left conflict markers (`<<<<<<<`) in it. Open it in an editor and keep one version, or move it out of the folder, then restart `serve.py`. The app does not save until the file is fixed.
 
 **Some changes are missing.** They were older than the saved file and were kept in `data/conflicts/conflict-<time>.json`, with a `reason` line. Copy the entries you need into `data/school-data.json` by hand while the server is stopped, then start it again.
+
+**The calendar shows no holidays.** Check Account › Calendar: the country may be set to None, or Public holidays may be hidden. For countries other than the Czech Republic the app needs the internet once per year to download them. It shows nationwide public holidays only, not regional ones.
 
 **The AI says the key is wrong.** Open Account, paste the key again and use **Test**. For OpenRouter the address must be `https://openrouter.ai/api/v1`.
 
