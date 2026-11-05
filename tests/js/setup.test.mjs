@@ -6,6 +6,7 @@
  */
 import { test, assert } from './harness.mjs';
 import { TEMPLATES } from '../../js/study.js';
+import { setLocale } from '../../js/locale.js';
 import {
   SETUP_ID, SETUP_TOOLS, SETUP_LESSONS, MAX_SETUP_ASSISTANTS,
   setupAssistant, setupPrompt, parseSetup, applySetup, setupSummary,
@@ -54,11 +55,21 @@ test('prompt demands one question per message and accepts done and hotovo', () =
 });
 
 test('prompt lists every template with label and hint, every tool and lesson', () => {
+  setLocale({ language: 'en', country: 'CZ' });
   const p = setupPrompt({ name: 'Physics' });
   for (const [key, t] of Object.entries(TEMPLATES)) {
     assert.ok(p.includes(`"${key}": ${t.label}. ${t.hint}`), `template ${key}`);
   }
   for (const [key, d] of Object.entries({ ...SETUP_TOOLS, ...SETUP_LESSONS })) assert.ok(p.includes(`"${key}": ${d}`), key);
+});
+
+test('outside the Czech Republic the prompt offers no Czech tools and describes the student by country', () => {
+  setLocale({ language: 'en', country: 'DE' });
+  const p = setupPrompt({ name: 'Physics' });
+  for (const key of Object.keys({ ...SETUP_TOOLS, ...SETUP_LESSONS })) assert.ok(!p.includes(`"${key}":`), key);
+  assert.ok(p.includes('a secondary school student in Germany'));
+  assert.ok(!p.includes('gymnázium'));
+  setLocale({ language: 'en', country: '' });
 });
 
 test('prompt quotes the current profile only when there is one and has no subject placeholder', () => {

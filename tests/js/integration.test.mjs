@@ -397,7 +397,7 @@ test('AC1: a new account starts with exactly one subject, Languages', () => {
 });
 
 test('AC2: every starter kit makes a valid subject; Chemistry gets the naming tool', () => {
-  assert.equal(KITS.length, 9);
+  assert.equal(KITS.length, 11);
   let counter = 0;
   for (const kit of KITS) {
     const subject = subjectFromKit(kit, { name: kit.name, icon: kit.icon, color: kit.color, id: `s${++counter}` });

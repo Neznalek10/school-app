@@ -5,12 +5,13 @@ import { GENERATORS } from '../soustavy.js';
 import { pickSession, record, levelOf, summarize, LEVELS } from '../srs.js';
 import { markdown } from '../md.js';
 import { html, raw, icon, plural, pct, levelDots, masteryBar } from '../ui.js';
+import { formatNumber } from '../locale.js';
 
 // Exercises from Maths and Physics lessons: solve, type the result, and open the hint or the solution only when you ask.
 
 export const LEVEL_LABELS = { 1: 'Easy', 2: 'Medium', 3: 'Hard' };
 const md = text => raw(markdown(text));
-const fmtNumber = n => n.toLocaleString('cs-CZ', { maximumSignificantDigits: 6 });
+const fmtNumber = n => formatNumber(n, { maximumSignificantDigits: 6 });
 
 export function exerciseStats(lessons) {
   const items = lessons.flatMap(l => exercisesOf(l).map(x => ({ id: `${l.id}|${x.key}`, x })));

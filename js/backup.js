@@ -18,7 +18,7 @@ const LIST_KEYS = ['subjects', 'notes', 'events', 'sources', 'lessons'];
 /** Keys of `data` that hold plain objects (kept as they are). */
 const OBJECT_KEYS = ['chats', 'chem'];
 /** Settings a backup may carry; `ai` is deliberately absent. */
-const SETTING_TYPES = { theme: 'string', aiLanguage: 'string', lastBackup: 'number' };
+const SETTING_TYPES = { theme: 'string', aiLanguage: 'string', uiLanguage: 'string', school: 'string', lastBackup: 'number' };
 
 /** Tells whether a value is a plain object (not null, not an array). */
 const isObject = v => v && typeof v === 'object' && !Array.isArray(v);

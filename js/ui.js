@@ -1,5 +1,7 @@
 import { store } from './store.js';
 import { LEVELS, MAX_STREAK, levelOf } from './srs.js';
+import { formatNumber } from './locale.js';
+import { nounFor } from './i18n.js';
 
 class Raw {
   constructor(s) { this.s = s; }
@@ -86,8 +88,8 @@ export const icon = (name, cls = '') =>
   raw(`<svg class="icon ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`);
 
 export const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
-export const fmt = n => (n >= 10000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K` : n.toLocaleString('en-US'));
-export const plural = (n, one, many = `${one}s`) => `${fmt(n)} ${n === 1 ? one : many}`;
+export const fmt = n => (n >= 10000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K` : formatNumber(n));
+export const plural = (n, one, many = `${one}s`) => `${fmt(n)} ${nounFor(n, one, many)}`;
 
 export function masteryBar(levels, { thin = false } = {}) {
   const total = Object.values(levels).reduce((a, b) => a + b, 0);

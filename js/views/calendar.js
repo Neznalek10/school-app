@@ -1,12 +1,13 @@
 import { store, uid } from '../store.js';
 import {
-  EVENT_TYPES, typeOf, isTask, firstLine, dayKey, parseDay, monthKey, isDay, isMonth, isTime, addMonths, whenLabel, formatDay, formatMonth, monthGrid, sortEvents, upcoming, past,
+  EVENT_TYPES, typeOf, isTask, shortMonth, firstLine, dayKey, parseDay, monthKey, isDay, isMonth, isTime, addMonths, whenLabel, formatDay, formatMonth, monthGrid, sortEvents, upcoming, past,
 } from '../events.js';
 import { html, icon, plural, segmented, onSegmented } from '../ui.js';
-import { tasksSection, mountTasks, taskHref } from './tasks.js';
+import { tasksSection, mountTasks, taskHref, pickSubject } from './tasks.js';
 import { CZECH, calendarItems, calendarByDay, countryName, fetchMissingHolidays } from '../holidays.js';
+import { bindDraft } from '../drafts.js';
+import { weekdayNames, uiLanguage } from '../locale.js';
 
-const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 const CZ_KINDS = { holiday: 'Public holiday', break: 'School break', school: 'School', important: 'Important day' };
 
 const czSpan = item => (item.start === item.end ? formatDay(item.start) : `${formatDay(item.start, { day: 'numeric', month: 'short' })} – ${formatDay(item.end, { day: 'numeric', month: 'short' })}`);
@@ -16,8 +17,8 @@ export function czRow(item, { today = dayKey() } = {}) {
   const d = parseDay(item.start);
   const when = item.start <= today && item.end >= today ? 'Now' : whenLabel(item.start, today);
   return html`<div class="note-row cz-row cz-${item.kind}">
-    <span class="ev-date cz-date"><strong>${d.getDate()}</strong><small>${d.toLocaleDateString('en-GB', { month: 'short' })}</small></span>
-    <span class="note-row-main"><strong>${item.cs}</strong><small>${item.en} · ${CZ_KINDS[item.kind]} · ${item.start === item.end ? when : `${czSpan(item)} · ${when}`}</small></span>
+    <span class="ev-date cz-date"><strong>${d.getDate()}</strong><small>${shortMonth(item.start)}</small></span>
+    <span class="note-row-main"><strong data-no-tr>${item.cs}</strong><small>${item.en && item.en !== item.cs && uiLanguage() !== 'cs' ? html`<span data-no-tr>${item.en}</span> · ` : ''}${CZ_KINDS[item.kind]} · ${item.start === item.end ? when : `${czSpan(item)} · ${when}`}</small></span>
   </div>`;
 }
 
@@ -30,7 +31,7 @@ export function eventRow(app, ev, { href = null, showSubject = false } = {}) {
   const d = parseDay(ev.date);
   const desc = firstLine(ev.description);
   const inner = html`
-    <span class="ev-date ev-${type.key}"><strong>${d.getDate()}</strong><small>${d.toLocaleDateString('en-GB', { month: 'short' })}</small></span>
+    <span class="ev-date ev-${type.key}"><strong>${d.getDate()}</strong><small>${shortMonth(ev.date)}</small></span>
     <span class="note-row-main">
       <strong>${ev.title}</strong>
       <small>${subject ? html`<span class="dot c-${subject.color}"></span>${subject.name} · ` : ''}${type.label} · ${whenLabel(ev.date)}${ev.time ? ` · ${ev.time}` : ''}${desc ? ` · ${desc}` : ''}</small>
@@ -63,6 +64,7 @@ export function eventSheet(app, subject, event = null, { date = dayKey(), type: 
     </form>`,
     onMount(body, close) {
       const form = body.querySelector('form');
+      const draft = bindDraft(form, `event:${event?.id || `new:${subject.id}`}`);
       onSegmented(body, (name, value) => { type = value; });
       form.addEventListener('submit', e => {
         e.preventDefault();
@@ -79,6 +81,7 @@ export function eventSheet(app, subject, event = null, { date = dayKey(), type: 
         const saved = event ? Object.assign(event, fields) : { id: uid('e'), subjectId: subject.id, ...fields, materials: [], done: false, created: Date.now() };
         if (!event) store.events.push(saved);
         store.save('events');
+        draft.clear();
         close();
         if (onSave) onSave(saved);
         else if (!event && isTask(saved)) app.go(taskHref(saved).slice(2));
@@ -90,6 +93,7 @@ export function eventSheet(app, subject, event = null, { date = dayKey(), type: 
         if (!ok) return;
         store.events = store.events.filter(x => x !== event);
         store.save('events');
+        draft.clear();
         if (onDelete) onDelete();
         else app.render();
       });
@@ -106,14 +110,40 @@ function viewSwitch(subject, view) {
   </div>`;
 }
 
-export function calendarPanel(app, subject, { month, day, view, status, kind }) {
-  if (view === 'table') {
+/**
+ * Route of a calendar page: inside one subject, or the Calendar tab with every subject (optionally one only).
+ *
+ * @param {object|null} subject The subject, or null for the Calendar tab.
+ * @param {string} [filter] Subject id the Calendar tab is limited to.
+ * @returns {string} A route without "#/", ending in "?" or a parameter, so "&month=..." can be appended.
+ */
+function calendarBase(subject, filter = '') {
+  if (subject) return `subject/${encodeURIComponent(subject.id)}?tab=calendar`;
+  return `calendar?${filter ? `s=${encodeURIComponent(filter)}` : 'all=1'}`;
+}
+
+/** The events a calendar page shows: one subject's, or every existing subject's on the Calendar tab. */
+function eventsFor(app, subject, filter) {
+  if (subject) return eventsOf(subject.id);
+  return store.events.filter(e => app.subject(e.subjectId) && (!filter || e.subjectId === filter));
+}
+
+/** Subject chips of the Calendar tab: All, then one chip per subject. */
+function subjectChips(filter) {
+  const chip = (id, label, color) => html`<a class="chip ${filter === id ? 'active' : ''}" href="#/${calendarBase(null, id)}">${color ? html`<span class="dot c-${color}"></span>` : ''}${label}</a>`;
+  return html`<div class="chips cal-chips">${chip('', 'All subjects')}${store.subjects.map(s => chip(s.id, s.name, s.color))}</div>`;
+}
+
+export function calendarPanel(app, subject, { month, day, view, status, kind, s: filterId }) {
+  const filter = !subject && app.subject(filterId) ? filterId : '';
+  if (subject && view === 'table') {
     return html`${viewSwitch(subject, 'table')}${tasksSection(app, { base: `subject/${encodeURIComponent(subject.id)}?tab=calendar&view=table`, subject, status, kind })}`;
   }
   const today = dayKey();
   const selected = isDay(day) ? day : null;
   const shown = isMonth(month) ? month : (selected ? selected.slice(0, 7) : monthKey());
-  const events = eventsOf(subject.id);
+  const events = eventsFor(app, subject, filter);
+  const row = ev => eventRow(app, ev, { showSubject: !subject });
   const byDay = new Map();
   for (const ev of sortEvents(events)) byDay.set(ev.date, [...(byDay.get(ev.date) || []), ev]);
   const next = upcoming(events);
@@ -129,7 +159,7 @@ export function calendarPanel(app, subject, { month, day, view, status, kind }) 
   const showLegend = settings.country && (czech.holidays || (isCzech && czech.important));
 
   const grid = html`<div class="cal-grid" role="grid" aria-label="${formatMonth(shown)}">
-    ${WEEKDAYS.map(w => html`<span class="cal-wd">${w}</span>`)}
+    ${weekdayNames().map(w => html`<span class="cal-wd">${w}</span>`)}
     ${weeks.flat().map(c => {
       const evs = byDay.get(c.key) || [];
       const days = cz.get(c.key) || [];
@@ -146,7 +176,7 @@ export function calendarPanel(app, subject, { month, day, view, status, kind }) 
 
   const dayEvents = selected ? byDay.get(selected) || [] : [];
   return html`
-    ${viewSwitch(subject, 'month')}
+    ${subject ? viewSwitch(subject, 'month') : subjectChips(filter)}
     <section class="card cal-card">
       <header class="cal-head">
         <button class="icon-btn" data-month="${addMonths(shown, -1)}" aria-label="Previous month">${icon('chevronLeft')}</button>
@@ -165,13 +195,13 @@ export function calendarPanel(app, subject, { month, day, view, status, kind }) 
     ${selected ? html`<section class="card">
       <header class="card-head"><h2>${formatDay(selected, { weekday: 'long', day: 'numeric', month: 'long' })}</h2><span class="card-meta">${whenLabel(selected)}</span></header>
       ${(cz.get(selected) || []).length ? html`<div class="note-list cz-list">${cz.get(selected).map(i => czRow(i))}</div>` : ''}
-      ${dayEvents.length ? html`<div class="note-list">${dayEvents.map(ev => eventRow(app, ev))}</div>` : html`<p class="muted">Nothing on this day.</p>`}
+      ${dayEvents.length ? html`<div class="note-list">${dayEvents.map(row)}</div>` : html`<p class="muted">Nothing on this day.</p>`}
       <button class="btn btn-primary btn-block" data-add="${selected}">${icon('plus')}Add on ${formatDay(selected)}</button>
     </section>` : html`<button class="btn btn-primary btn-block cal-add" data-add="${today}">${icon('plus')}Add a test or event</button>`}
 
     <section class="card">
       <header class="card-head"><h2>Coming up</h2><span class="card-meta">${plural(next.length, 'event')}</span></header>
-      ${next.length ? html`<div class="note-list">${next.map(ev => eventRow(app, ev))}</div>` : html`<p class="muted">No tests or events ahead. Tap a day to add one.</p>`}
+      ${next.length ? html`<div class="note-list">${next.map(row)}</div>` : html`<p class="muted">No tests or events ahead. Tap a day to add one.</p>`}
     </section>
 
     ${showLegend ? html`<section class="card">
@@ -180,22 +210,46 @@ export function calendarPanel(app, subject, { month, day, view, status, kind }) 
       ${isCzech && czech.holidays && !czech.district && ['01', '02', '03'].includes(shown.slice(5)) ? html`<a class="notice notice-warn notice-link cz-hint" href="#/account">${icon('info')}<span>Pick your school's district in Account to see your spring break.</span></a>` : ''}
     </section>` : ''}
 
-    ${done.length ? html`<details class="card cal-past">
+    ${done.length ? html`<details class="card cal-past" ${subject ? '' : 'open'}>
       <summary>Past · ${plural(done.length, 'event')}</summary>
-      <div class="note-list">${done.map(ev => eventRow(app, ev))}</div>
+      <div class="note-list">${done.map(row)}</div>
     </details>` : ''}`;
 }
 
-export function mountCalendar(app, subject, root, { day, view }) {
-  if (view === 'table') return mountTasks(app, root, { subject });
-  const base = `subject/${encodeURIComponent(subject.id)}?tab=calendar`;
+export function mountCalendar(app, subject, root, { day, view, s: filterId }) {
+  if (subject && view === 'table') return mountTasks(app, root, { subject });
+  const filter = !subject && app.subject(filterId) ? filterId : '';
+  const base = calendarBase(subject, filter);
+  // On the Calendar tab a new plain event stays on the tab; tests and homework open their own page as usual.
+  const stayHere = subject ? undefined : saved => app.go(isTask(saved) ? taskHref(saved).slice(2) : `${base}&month=${saved.date.slice(0, 7)}&day=${saved.date}`, { replace: !isTask(saved) });
+  const add = date => {
+    const open = s => eventSheet(app, s, null, { date, onSave: stayHere });
+    if (subject || filter) open(subject || app.subject(filter));
+    else pickSubject(app, open);
+  };
   root.querySelectorAll('[data-month]').forEach(btn => btn.addEventListener('click', () => app.go(`${base}&month=${btn.dataset.month}`, { replace: true })));
   root.querySelectorAll('[data-day]').forEach(btn => btn.addEventListener('click', () => {
     const key = btn.dataset.day;
     app.go(key === day ? `${base}&month=${key.slice(0, 7)}` : `${base}&month=${key.slice(0, 7)}&day=${key}`, { replace: true });
   }));
-  root.querySelectorAll('[data-add]').forEach(btn => btn.addEventListener('click', () => eventSheet(app, subject, null, { date: btn.dataset.add })));
+  root.querySelectorAll('[data-add]').forEach(btn => btn.addEventListener('click', () => add(btn.dataset.add)));
   root.querySelectorAll('[data-event]').forEach(btn => btn.addEventListener('click', () => {
-    eventSheet(app, subject, store.events.find(e => e.id === btn.dataset.event));
+    const ev = store.events.find(e => e.id === btn.dataset.event);
+    eventSheet(app, subject || app.subject(ev.subjectId), ev, { onSave: subject ? undefined : () => app.render() });
   }));
+}
+
+/**
+ * The Calendar tab: every subject's tests, homework and events in one month view, with all upcoming and past items.
+ *
+ * @param {object} app The app shell.
+ * @param {object} params Route parameters: month, day and s (one subject only).
+ * @returns {{title: string, body: object, mount: (root: Element) => void}} The view.
+ */
+export function calendarView(app, params) {
+  return {
+    title: 'Calendar',
+    body: calendarPanel(app, null, params),
+    mount: root => mountCalendar(app, null, root, params),
+  };
 }
