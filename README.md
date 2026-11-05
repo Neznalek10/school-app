@@ -65,7 +65,7 @@ Install the shortcut once:
 venv/bin/python launcher.py --install
 ```
 
-"School app" then appears in the app menu and on the Desktop. Clicking it starts the server in the background (if it isn't running yet) and opens the app. In Chrome, Chromium, Brave or Edge it opens as its own window. In Firefox it opens a normal browser window, because Firefox has no app-window mode. To stop the server, right-click the shortcut and choose **Stop the server**, or run `venv/bin/python launcher.py --stop`. The server's log is in `~/.local/state/school-app/server.log`.
+"School app" then appears in the app menu and on the Desktop (the first time, right-click the Desktop icon and choose **Allow Launching** if GNOME asks). Clicking it starts the server in the background (if it isn't running yet) and opens the app. In Chrome, Chromium, Brave or Edge it opens as its own window. In Firefox it opens a normal browser window, because Firefox has no app-window mode. To stop the server, right-click the shortcut and choose **Stop the server**, or run `venv/bin/python launcher.py --stop`. The server's log is in `~/.local/state/school-app/server.log`.
 
 | Command | What it does |
 |---|---|
