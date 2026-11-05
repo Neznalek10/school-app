@@ -4,7 +4,7 @@ import {
 } from '../events.js';
 import { html, icon, plural, segmented, onSegmented } from '../ui.js';
 import { tasksSection, mountTasks, taskHref } from './tasks.js';
-import { czechItems, czechByDay } from '../czech.js';
+import { CZECH, calendarItems, calendarByDay, countryName, fetchMissingHolidays } from '../holidays.js';
 
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 const CZ_KINDS = { holiday: 'Public holiday', break: 'School break', school: 'School', important: 'Important day' };
@@ -119,11 +119,14 @@ export function calendarPanel(app, subject, { month, day, view, status, kind }) 
   const next = upcoming(events);
   const done = past(events);
   const weeks = monthGrid(shown);
-  const czech = store.settings.czech;
-  const cz = czechByDay(weeks[0][0].key, weeks[5][6].key, czech);
+  const settings = store.settings;
+  const czech = settings.czech;
+  const isCzech = settings.country === CZECH;
+  fetchMissingHolidays(weeks[0][0].key, weeks[5][6].key, settings, () => app.render());
+  const cz = calendarByDay(weeks[0][0].key, weeks[5][6].key, settings);
   // "-31" is a safe upper bound for any month, because dates compare as strings.
-  const monthItems = czechItems(`${shown}-01`, `${shown}-31`, czech);
-  const showLegend = czech.holidays || czech.important;
+  const monthItems = calendarItems(`${shown}-01`, `${shown}-31`, settings);
+  const showLegend = settings.country && (czech.holidays || (isCzech && czech.important));
 
   const grid = html`<div class="cal-grid" role="grid" aria-label="${formatMonth(shown)}">
     ${WEEKDAYS.map(w => html`<span class="cal-wd">${w}</span>`)}
@@ -154,8 +157,8 @@ export function calendarPanel(app, subject, { month, day, view, status, kind }) 
       ${grid}
       <div class="cal-legend">${EVENT_TYPES.map(t => html`<span><i class="ev-${t.key}"></i>${t.label}</span>`)}</div>
       ${showLegend ? html`<div class="cal-legend cz-legend">
-        ${czech.holidays ? html`<span><b class="cz-off">17</b>Holiday</span><span><b class="cz-brk"></b>School break</span>` : ''}
-        ${czech.important ? html`<span><i class="cz-mark"></i>Important day</span>` : ''}
+        ${czech.holidays ? html`<span><b class="cz-off">17</b>Holiday</span>${isCzech ? html`<span><b class="cz-brk"></b>School break</span>` : ''}` : ''}
+        ${isCzech && czech.important ? html`<span><i class="cz-mark"></i>Important day</span>` : ''}
       </div>` : ''}
     </section>
 
@@ -172,9 +175,9 @@ export function calendarPanel(app, subject, { month, day, view, status, kind }) 
     </section>
 
     ${showLegend ? html`<section class="card">
-      <header class="card-head"><h2>Czech calendar · ${formatMonth(shown)}</h2><a class="card-link" href="#/account">Settings${icon('chevronRight')}</a></header>
-      ${monthItems.length ? html`<div class="note-list cz-list">${monthItems.map(i => czRow(i))}</div>` : html`<p class="muted">No holidays or school breaks this month.</p>`}
-      ${czech.holidays && !czech.district && ['01', '02', '03'].includes(shown.slice(5)) ? html`<a class="notice notice-warn notice-link cz-hint" href="#/account">${icon('info')}<span>Pick your school's district in Account to see your spring break.</span></a>` : ''}
+      <header class="card-head"><h2>${isCzech ? 'Czech calendar' : `Holidays in ${countryName(settings.country)}`} · ${formatMonth(shown)}</h2><a class="card-link" href="#/account">Settings${icon('chevronRight')}</a></header>
+      ${monthItems.length ? html`<div class="note-list cz-list">${monthItems.map(i => czRow(i))}</div>` : html`<p class="muted">${isCzech ? 'No holidays or school breaks this month.' : 'No public holidays this month.'}</p>`}
+      ${isCzech && czech.holidays && !czech.district && ['01', '02', '03'].includes(shown.slice(5)) ? html`<a class="notice notice-warn notice-link cz-hint" href="#/account">${icon('info')}<span>Pick your school's district in Account to see your spring break.</span></a>` : ''}
     </section>` : ''}
 
     ${done.length ? html`<details class="card cal-past">
