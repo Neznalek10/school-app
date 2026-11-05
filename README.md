@@ -1,211 +1,293 @@
 # School
 
-A personal school hub for one student: subjects with notes, AI assistants, learning plans, a calendar and practice apps. Everything you build is saved in one readable JSON file, written by a small local Python server, so it can move between computers with git.
+A study hub for one student: your subjects, notes, tests and homework, AI assistants that know how your class works, and practice apps for languages, chemistry naming and maths. Everything runs on your own computer. Your progress is saved in one readable file that you can back up or move to another computer with git.
 
-## Features
+It was built for a Czech secondary school (gymnázium). The interface is in English. Some tools and prompts are Czech-specific: the Czech chemistry naming trainer (Názvosloví), the Czech literature plan, the ZSV plan and the MŠMT school-year calendar. Everything else works for any school.
 
-- **Starts with Languages.** A new account has one subject, Languages, which opens the French and English practice apps. Add, rename, recolour and delete subjects whenever you like. Existing accounts keep their subjects.
-- **Starter kits.** The New subject sheet has an optional "Start from" row: Mathematics, Physics, Chemistry, Czech, History, ZSV, Biology, Geography and Computer science. A kit fills in the name, icon, colour and learning-plan template, and adds built-in tools or lessons: the Názvosloví trainer for Chemistry, the Číselné soustavy lesson for Computer science. Without a kit you get a plain subject.
-- **"Set up this subject" interview.** Creating a subject opens its setup page (`#/setup/<subject id>`). The AI asks one question at a time about the course, main sources, how tests look, the teacher's style, what is hard, your goals and your answer language. It ends with one setup proposal, which you apply to write the **subject profile**, the learning-plan template and extra instructions, up to four custom assistants, and any built-in tools or lessons. Every assistant, copy-paste prompt and lesson prompt then uses the profile.
-  - In the app: "Interview in the app" opens the chat. The proposal gets an "Apply to <subject>" card.
-  - Without the server or an API key: "Use ChatGPT or Gemini" copies the prompt, you paste the final answer back, check the preview, and apply.
-- **Subject page.** Tabs for Calendar, Notes, Sources, Practice and AI. A subject reopens on the tab you used last.
-- **Calendar.** A month grid per subject, weeks start on Monday. Events are tests, deadlines or other events, with an optional time and note. Home lists what is coming up in the next 30 days.
-- **Tests and homework.** A table of everything due across subjects, filtered to To do, Done or All. Each item has its own page with a description, attached study material, a done flag and, for tests, a grade. Homework past its date stays in To do as overdue.
-- **Lessons from learning plans.** Each subject has a plan that turns a presentation into a lesson: copy the prompt, give it to ChatGPT or Gemini with the presentation, paste the JSON answer back. The parser repairs common chat mistakes such as code fences, trailing commas and curly quotes. Templates cover history, general subjects, highlighted Word documents (ZSV), literature (Czech), research (Biology, Geography), and maths and physics with worked exercises.
-- **Exercises.** Maths and physics lessons include numbered exercises, from level 1 to 3. Type the result: the app compares values, allows a rounding tolerance and checks units. Hints and solutions open only on request.
-- **Názvosloví.** A Czech inorganic nomenclature and elements trainer, modelled on nazvoslovi.cz. It covers 1,382 compounds and all 118 elements, has tests for name and formula, and includes theory pages. Chemistry subjects get it from their starter kit.
-- **Czech calendar.** Month views mark public holidays, school breaks and important days, using the MŠMT school-year dates. Each part can be switched off in Account.
-- **Sources.** Websites (http and https only), uploaded files and references. Uploaded files are kept in the browser (IndexedDB), not in the data file.
-- **Practice.** The subject's practice apps, quick links to AI quiz and checking, and a reminder when a test is within 30 days.
-- **Copy-paste prompts.** Every assistant and the lesson prompt can be copied as one ready message for ChatGPT, Gemini or Claude, with the notes you choose. No API key needed.
-- **Notes.** A light Markdown subset (headings, bullets, bold, italic, code). Notes save automatically.
-- **AI assistants.** Five presets per subject (Tutor, Quiz me, Study sheet, Research, Check my work), plus your own. You choose what an assistant may read: all notes, one note, or none. The default AI service is OpenRouter (`openrouter/free`). Ollama is also supported. Settings live in Account.
-- **One data file.** Progress from the dashboard and both language apps is saved to `data/school-data.json` within about 1.5 seconds of a change, and when the page is hidden. A stale tab cannot overwrite newer data. Data that loses a conflict is kept in `data/conflicts/`.
-- **Browser-only mode.** Without the server (for example on GitHub Pages), the app works as before and keeps data in the browser. Account says which mode is active.
+## Contents
 
-## Quick start
+- [What it does](#what-it-does)
+- [Two ways to use it](#two-ways-to-use-it)
+- [Installation](#installation)
+- [Starting the app](#starting-the-app)
+- [First steps](#first-steps)
+- [Setting up the AI](#setting-up-the-ai)
+- [Your data](#your-data)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [For developers](#for-developers)
+
+## What it does
+
+**Subjects you build yourself.** A new account starts with one subject, Languages, which opens a French course and an English vocabulary trainer. You add the rest. The New subject sheet offers optional starter kits (Mathematics, Physics, Chemistry, Czech, History, ZSV, Biology, Geography, Computer science) that fill in the icon, colour, study plan and built-in tools. You can also start from an empty subject.
+
+**An AI interview that personalises each subject.** Every subject has a "Set up this subject" assistant. It asks one question at a time: what the course covers, your main sources, what tests look like, how your teacher grades, what you find hard and what you want to reach. It ends with a setup proposal. You check a preview, apply it, and from then on every assistant, prompt and lesson for that subject uses this profile. You can run the interview inside the app or copy it into ChatGPT or Gemini.
+
+**Everything a subject needs, in one page.**
+- **Calendar** with tests, homework and events, plus Czech public holidays, school breaks and important days.
+- **Tests and homework** table across all subjects, with a page per item for the description, study material and grade.
+- **Notes** in light Markdown, saved automatically.
+- **Sources**: websites, uploaded files (PDF, images, text) and book references.
+- **Lessons**: give a presentation, a worksheet or textbook pages to an AI with the subject's prompt, paste the answer back, and get notes, a timeline, key terms, questions and flashcards. Maths and physics lessons become exercises with checked answers, hints and step-by-step solutions on request.
+- **AI assistants**: Tutor, Quiz me, Study sheet, Research and Check my work, plus your own. Each one can read all your notes for the subject, one note, or none.
+
+**Practice apps.**
+- French course with lessons, vocabulary and conjugation drills.
+- English vocabulary trainer for any word list you import (CSV, JSON or pasted text).
+- Názvosloví: 1,382 Czech inorganic compounds and all 118 elements, with theory pages and a periodic table.
+- Číselné soustavy: number system conversions with generated exercises (Computer science kit).
+
+**Works without an AI key.** Every assistant and lesson prompt can be copied as one ready message for ChatGPT, Gemini or Claude, with your notes included.
+
+**Private by design.** The app only answers requests from your own computer. AI keys are kept in a `.env` file, never in the data file. Nothing is sent anywhere except to the AI service you choose.
+
+## Two ways to use it
+
+| | Online (GitHub Pages) | On your computer |
+|---|---|---|
+| Install | Nothing, open a link | Python 3.12 and two commands |
+| Where progress is saved | In that browser only | In `data/school-data.json`, plus the browser |
+| Move to another computer | Back up and restore a file by hand | Copy the folder, or use git |
+| AI key | Typed once per browser | Saved in `.env`, filled in for you |
+
+**Online.** If the repository owner has turned on GitHub Pages, open `https://<account>.github.io/school-app/` (replace `<account>` with the GitHub account name). The app runs fully in your browser. Account › Storage says "Saved in this browser only". Use Account › Back up now and then, because clearing the browser's site data deletes your progress.
+
+**On your computer.** Follow the installation below. This is the full version: progress is written to a file within about two seconds of every change.
+
+## Installation
 
 ### Requirements
 
-- Python 3.12 (the version the project is tested with). The server uses only the standard library plus `python-dotenv`.
-- A current browser (Firefox, Chrome or Edge).
-- Optional: `gjs` or `node`, only to run the JavaScript tests. Node is not needed to run the app.
+- **Python 3.12** ([python.org](https://www.python.org/downloads/) on Windows and macOS. On Linux it is usually installed already.)
+- **A current browser**: Firefox, Chrome, Edge, Brave or Safari.
+- **git** (optional), to download the code and to keep your progress in a repository.
 
-### Install
+Tested on Linux with Firefox. Windows and macOS should work with the commands below but have not been tested yet.
 
-From the project folder:
+### 1. Get the code
+
+With git, using the address from the green **Code** button on the repository page:
 
 ```bash
-python3 -m venv venv && venv/bin/pip install -r requirements.txt
+git clone <repository URL> school-app
+cd school-app
 ```
 
-The second command installs `python-dotenv`. There is no build step.
+Without git: click **Code › Download ZIP**, unpack it and open a terminal in the unpacked folder.
 
-### Run
+### 2. Create the Python environment
+
+Linux and macOS:
+
+```bash
+python3 -m venv venv
+venv/bin/pip install -r requirements.txt
+```
+
+Windows (PowerShell):
+
+```powershell
+py -3.12 -m venv venv
+venv\Scripts\pip install -r requirements.txt
+```
+
+This installs one package, `python-dotenv`. There is no build step and no Node.js needed.
+
+## Starting the app
+
+Linux and macOS:
 
 ```bash
 venv/bin/python serve.py
 ```
 
-Expected output:
+Windows:
+
+```powershell
+venv\Scripts\python serve.py
+```
+
+You should see:
 
 ```
 School app: http://127.0.0.1:8767/
 Data file: <project folder>/data/school-data.json
 ```
 
-Open http://127.0.0.1:8767/ in your browser. Press Ctrl+C in the terminal to stop the server.
+Open http://127.0.0.1:8767/ in your browser. Keep the terminal open while you use the app, and press Ctrl+C there to stop it.
 
-### Open it like an app (no terminal)
+Always use the same address, `http://127.0.0.1:8767/`. Browsers keep separate storage per address, so `localhost` or another port would show an empty app.
 
-Install the shortcut once:
+### Desktop shortcut (Linux)
+
+To start the app with a click instead of a terminal, install the shortcut once:
 
 ```bash
 venv/bin/python launcher.py --install
 ```
 
-"School app" then appears in the app menu and on the Desktop (the first time, right-click the Desktop icon and choose **Allow Launching** if GNOME asks). Clicking it starts the server in the background (if it isn't running yet) and opens the app. In Chrome, Chromium, Brave or Edge it opens as its own window. In Firefox it opens a normal browser window, because Firefox has no app-window mode. To stop the server, right-click the shortcut and choose **Stop the server**, or run `venv/bin/python launcher.py --stop`. The server's log is in `~/.local/state/school-app/server.log`.
+"School app" appears in the app menu and on the Desktop. If GNOME asks, right-click the Desktop icon once and choose **Allow Launching**. A click starts the server in the background if it is not running yet and opens the app. In Chrome, Chromium, Brave or Edge it opens in its own window without tabs. Firefox has no app-window mode, so it opens a normal window. To stop the server, right-click the shortcut and choose **Stop the server**.
 
 | Command | What it does |
 |---|---|
-| `venv/bin/python launcher.py` | Start the server if needed and open the app |
+| `venv/bin/python launcher.py` | Start the server if needed, then open the app |
 | `venv/bin/python launcher.py --stop` | Stop a server the launcher started |
 | `venv/bin/python launcher.py --install [--no-desktop]` | Add the shortcut to the app menu (and the Desktop) |
 | `venv/bin/python launcher.py --uninstall` | Remove the shortcuts |
 
-Set `SCHOOL_APP_BROWSER` to choose the browser, for example `SCHOOL_APP_BROWSER="firefox --new-window"`. The shortcut stores this folder's location, so after moving the folder run `--install` again. On a new machine, install once after creating the venv.
+The shortcut remembers where the folder is. After moving the folder, run `--install` again. The server's log is in `~/.local/state/school-app/server.log`. To pick the browser, set `SCHOOL_APP_BROWSER`, for example `SCHOOL_APP_BROWSER="firefox --new-window"`.
 
-Use `127.0.0.1`, not `localhost`. Browsers keep separate storage for each address, and the old version of the app ran on `127.0.0.1:8767`, so your existing browser data is found there.
+## First steps
 
-## Usage
+1. Open the app and type your name. This creates your account (only a name, no password, no sign-up).
+2. Your account has one subject, Languages. Open it to reach the French course and the English vocabulary trainer.
+3. Click **New subject**. Pick a starter kit under "Start from", or leave it on None, and give the subject a name.
+4. The subject's setup page opens. Choose:
+   - **Interview in the app**, if you have set up an AI key (see below), or
+   - **Use ChatGPT or Gemini**: copy the prompt, paste it into the chat, answer the questions there, and paste the final answer back into the box.
+5. Check the preview and click **Apply**. The subject now has its profile, study plan, tailored assistants and tools.
+6. Add your next test in the subject's Calendar. Assistants see upcoming tests and use them when they help you.
 
-### Command-line options
+To change a subject's setup later, open the subject and click **Profile and setup**.
 
-```bash
-venv/bin/python serve.py --help
-```
+## Setting up the AI
 
-```
-usage: serve.py [-h] [--port PORT] [--host HOST] [--open] [--verbose]
+The assistants need an AI service. You have three options.
 
-Run the school app locally and keep its data in data/school-data.json.
+**OpenRouter (default, free models available).**
+1. Create an account at [openrouter.ai](https://openrouter.ai/) and create an API key.
+2. In the app, open **Account**, paste the key under AI settings and save. The default model is `openrouter/free`, which costs nothing.
+3. With the local server running, the key is saved in `.env` in the project folder ("Saved in .env on this computer") and filled in automatically next time.
 
-options:
-  -h, --help   show this help message and exit
-  --port PORT  port to listen on (default 8767)
-  --host HOST  loopback address to bind (default 127.0.0.1, this computer
-               only)
-  --open       open the app in the default browser
-  --verbose    log every request and internal detail to stderr
-```
+**Ollama (runs on your own computer, no key).** Install [Ollama](https://ollama.com/), download a model (for example `ollama pull llama3.2`), then in Account click **Ollama on this PC** (it sets the address to `http://localhost:11434/v1`) and type the name of the model you downloaded.
 
-### First steps in the app
+**No AI service at all.** Use the copy buttons. Every assistant, the setup interview and every lesson prompt can be copied into ChatGPT, Gemini or Claude in your browser.
 
-1. Open http://127.0.0.1:8767/ and create your account (a name).
-2. You see one subject, Languages. Open **New subject** to add a subject. Pick a starter kit from "Start from", or leave it on None.
-3. The setup page opens. Choose **Interview in the app** and answer the questions, or **Use ChatGPT or Gemini** to copy the prompt. Apply the proposal when the preview looks right.
-4. To use the AI assistants, open **Account** and enter your OpenRouter key under the AI settings. The app writes it to `.env` and shows "Saved in .env on this computer". The key is never written to the data file.
+Keep your key private. It is never written to the data file, backups or the repository. `.env` is git-ignored and readable only by your user.
 
-### Check the server
+## Your data
 
-```bash
-curl -i http://127.0.0.1:8767/api/status
-```
+### Where it is
 
-Example body, before the first save:
+| What | Where |
+|---|---|
+| Subjects, notes, calendar, lessons, practice progress | `data/school-data.json` (and the browser) |
+| Changes that lost a conflict | `data/conflicts/` |
+| AI key | `.env` |
+| Uploaded files (PDFs, images) | The browser only (IndexedDB) |
 
-```json
-{"app": "school-app", "version": "2.0.0", "mode": "file", "dataFile": "data/school-data.json", "exists": false, "revision": 0, "savedAt": null, "hasAiKey": false}
-```
+The data file is plain, readable JSON. The app saves it within about 1.5 seconds of each change. If two browsers or computers edit at the same time, the newest saved version wins and the other one is kept in `data/conflicts/`, never deleted. The app then shows a message.
 
-After the first save, `exists` is `true` and `revision` counts up with each save.
+Uploaded files are not part of the data file. Keep the originals elsewhere if you want them on another computer.
+
+### Backups
+
+Account › **Back up** downloads one file with your subjects, notes, calendar and sources. **Restore** reads it back. The French and English apps have their own Back up in their settings.
+
+### Moving to another computer
+
+**By hand.** Copy the whole folder, except `venv/`, to the other computer, create the venv there (see Installation) and start the app. Copy `.env` too if you want your AI key there, or type the key again.
+
+**With git (recommended).** The public repository ignores `data/`, so your progress never ends up in it. To keep your progress in git, use a **private** repository of your own:
+
+1. On GitHub, create a new **private** repository with no files in it.
+2. In your `school-app` folder:
+
+   ```bash
+   git remote rename origin upstream
+   git remote add origin <your private repository URL>
+   ```
+
+3. Open `.gitignore` and delete the line `data/` under "Personal progress data is never published".
+4. Save and push your progress:
+
+   ```bash
+   git add .gitignore data
+   git commit -m "Save progress"
+   git push -u origin main
+   ```
+
+5. On the other computer: `git clone <your private repository URL> school-app`, create the venv, copy `.env` by hand (it is never in git) and start the app. It loads your data and reloads once.
+
+From then on, commit and push `data/` when you finish on one computer, and pull before you start on the other. To get updates of the app itself, run `git pull upstream main`.
+
+Never push `data/` to a public repository: it contains your notes and grades.
 
 ## Configuration
 
-Settings come from three places: the `.env` file, command-line options and the app's Account page.
-
 | Name | Where | Default | What it does |
 |---|---|---|---|
-| `AI_API_KEY` | `.env` | empty | OpenRouter API key for the AI assistants. The app writes it when you enter a key in Account. It is never stored in the data file. |
-| `--port` | `serve.py` option | `8767` | Port to listen on. Keep the default so existing browser data is picked up. |
-| `--host` | `serve.py` option | `127.0.0.1` | Address to bind. Only loopback addresses are accepted. Anything else exits with an error. |
+| `AI_API_KEY` | `.env` | empty | Your OpenRouter key. The app writes it when you enter a key in Account. To set it by hand, copy `.env.example` to `.env`. |
+| `--port` | `serve.py` option | `8767` | Port to listen on. Changing it means a new address with empty browser storage. |
+| `--host` | `serve.py` option | `127.0.0.1` | Only `127.0.0.1`, `::1` or `localhost` are accepted. The app is never reachable from other computers. |
 | `--open` | `serve.py` option | off | Opens the app in the default browser at start. |
 | `--verbose` | `serve.py` option | off | Logs every request. Request bodies and keys are never logged. |
-| `PUBLIC_AUTHOR_NAME`, `PUBLIC_AUTHOR_EMAIL` | environment, read by `tools/make-public.sh` | `School app`, a no-reply address | Author of the commits on the public branch. |
-| AI service, model, language | Account page | `https://openrouter.ai/api/v1`, `openrouter/free`, English | Where the AI requests go, which model answers, and the answer language. |
+| `SCHOOL_APP_BROWSER` | environment, read by `launcher.py` | automatic | Browser command the shortcut uses. |
+| AI address, model, answer language | Account page | OpenRouter, `openrouter/free`, English | Where AI requests go and how assistants answer. |
 
-`.env` is git-ignored. To set the key by hand, copy `.env.example` to `.env` and fill in `AI_API_KEY`. Keep the file private: it is created with mode 0600.
+"Forget key" in Account removes the key from `.env` and from this browser. Another browser on the same computer that still holds the key saves it again when it opens the app, so clear it there too. Keys for services other than OpenRouter stay only in the browser where you typed them.
 
-"Forget key" in Account empties `.env` and the key fields in this browser. Another browser on the same computer that still holds the key saves it to `.env` again when it opens the app, so clear the key there too. Keys for other providers (not OpenRouter) stay in the browser where you typed them and are never written to `.env`.
+## Troubleshooting
 
-## Running the tests
+**"Port 8767 is in use".** Another program uses the port, often a `serve.py` that is still running in another terminal. Stop it with Ctrl+C there, or run `venv/bin/python launcher.py --stop` if the shortcut started it.
+
+**Account says "Saved in this browser only".** The page was opened without the local server, for example from GitHub Pages or as a plain file. Start `serve.py` and open http://127.0.0.1:8767/. Data already in that browser is saved to the file on the first start.
+
+**The app is empty after starting it on another computer or port.** Check the address: it must be exactly `http://127.0.0.1:8767/`. Then check that `data/school-data.json` is in the folder.
+
+**"The stored data file is damaged".** `data/school-data.json` is not valid JSON, most often because a git merge left conflict markers (`<<<<<<<`) in it. Open it in an editor and keep one version, or move it out of the folder, then restart `serve.py`. The app does not save until the file is fixed.
+
+**Some changes are missing.** They were older than the saved file and were kept in `data/conflicts/conflict-<time>.json`, with a `reason` line. Copy the entries you need into `data/school-data.json` by hand while the server is stopped, then start it again.
+
+**The AI says the key is wrong.** Open Account, paste the key again and use **Test**. For OpenRouter the address must be `https://openrouter.ai/api/v1`.
+
+**The Desktop shortcut does nothing.** Right-click it and choose **Allow Launching**. If the folder was moved, run `venv/bin/python launcher.py --install` again. Errors appear as a notification and in `~/.local/state/school-app/server.log`.
+
+## For developers
+
+### Tests
 
 ```bash
 tools/test.sh
 ```
 
-The script runs the Python unittest suite and then the JavaScript suite, under `gjs` (or `node` when `gjs` is missing). Both always run, and the script exits 1 if either fails. A passing run ends with `All tests passed.`
+It runs the Python unittest suite and the JavaScript suite (under `gjs`, or `node` when `gjs` is missing) and ends with `All tests passed.` The tests use temporary folders and fake browser objects and make no network calls. A GitHub Actions workflow runs them on every push and pull request.
 
-The tests use temporary folders and fake browser objects. They make no network calls.
-
-## Project structure
+### Project structure
 
 ```
 school-app/
-  serve.py              entry point: starts the local server
+  serve.py              starts the local server
   launcher.py           desktop shortcut: starts the server in the background and opens the app
   server/               HTTP routes, request guard, data file, .env file
-  js/                   app code (dashboard views, store, AI, prompts, setup)
-    sync/               browser sync: engine, snapshot, client, page entry
+  js/                   dashboard code (views, store, AI, prompts, subject setup)
+    sync/               saving browser data to the data file
   css/, icons/          styles and icons
-  index.html, sw.js     dashboard and offline cache
-  apps/french/          French practice app (embedded)
-  apps/vocab/           English vocabulary app (embedded)
+  index.html, sw.js     dashboard page and offline cache
+  apps/french/          French course
+  apps/vocab/           English vocabulary trainer
   tools/                test.sh, make-public.sh, content sync scripts
-  tests/                Python tests (tests/) and JavaScript tests (tests/js/)
+  tests/                Python tests and JavaScript tests (tests/js/)
   docs/ARCHITECTURE.md  how the pieces fit together
-  data/                 created by the server: school-data.json, conflicts/ (see below)
+  data/                 created by the server: school-data.json, conflicts/
   .env                  your AI key (git-ignored, created by the app)
 ```
 
-## How it works
+### How it works
 
-- The app runs in the browser and keeps its data in `localStorage`, as before.
-- `js/sync/` watches the keys of the dashboard and both language apps (`school.`, `school-fr.`, `vocab2.`). After about 1.5 seconds without changes, or when the page is hidden, it sends the data to the local server.
-- The server checks each request, validates the data and writes `data/school-data.json` with a revision number. A save based on an old revision is refused, and the losing data goes to `data/conflicts/`.
-- AI keys are moved to `.env` before any data is saved, so the data file never contains them.
+- The app is plain HTML, CSS and JavaScript modules with no build step. It keeps its data in the browser's `localStorage`.
+- `js/sync/` watches the dashboard's and both language apps' data. After about 1.5 seconds without changes, or when the page is hidden, it sends the data to the local server, with AI keys removed.
+- The server (`server/`, Python standard library) checks that each request comes from this computer, validates the data and writes `data/school-data.json` with a revision number. A save based on an old revision is refused, and the losing side goes to `data/conflicts/`.
+- On start, the browser compares its data with the file and adopts, saves or restores, so another computer's progress loads with one reload.
 
-For the components, the sync protocol and the data formats, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the components, the sync protocol and the data formats in detail.
 
-## Moving to another computer
+### Publishing a clean public copy
 
-The data folder is tracked by git in the private repository this app is kept in. The public copy leaves it out.
-
-1. Commit and push the project from the first computer, including `data/`.
-2. Pull the repository on the second computer.
-3. Copy `.env` by hand. It is git-ignored, so git does not carry it. Use a private channel, or enter the AI key again in Account.
-4. Create the venv on the second computer (`python3 -m venv venv && venv/bin/pip install -r requirements.txt`). Do not copy `venv/`.
-5. Run `venv/bin/python serve.py` and open http://127.0.0.1:8767/. The app restores the data and reloads once.
-
-If you change data on two computers without syncing in between, the last saved revision wins. The other copy is kept in `data/conflicts/`. The app does not sync in real time.
-
-## Publishing a public copy
+For the maintainer of a private copy that tracks `data/`:
 
 ```bash
 tools/make-public.sh [target-dir]
 ```
 
-The script builds a `public` branch from the current commit without `data/`, with a neutral author. It clones or updates the copy in `../school-app-public` by default, then prints the commands to push it. It refuses to finish if the public files contain your git user name or email, or any word listed in `tools/private-words.txt` (a git-ignored file, one word per line). Optionally, `tools/public-exclude.txt` lists more paths to leave out.
-
-Nothing on disk is deleted by the script. The public copy includes a GitHub Actions workflow that runs the tests on each push.
-
-## Troubleshooting
-
-**"Port 8767 is in use" when starting `serve.py`.** Another program is using the port, often an earlier `serve.py` still running. Stop that process, or start with `venv/bin/python serve.py --port 8768`. Note that a different port means a different address, so the browser data kept under 8767 will not show up there.
-
-**Account says "Saved in this browser only".** The page runs without the local server, for example from GitHub Pages or a plain static server. Start `venv/bin/python serve.py` and reload http://127.0.0.1:8767/. Data already in the browser is written to the data file on the first start.
-
-**The app says "The stored data file is damaged".** `data/school-data.json` is not valid, most often because a git merge left conflict markers in it. Open the file in an editor and keep one version, or move the file out of the folder. Then restart `serve.py`. Until you restart, the app does not save. If you moved the file out, the next start saves the browser's data as a new file.
-
-**Changes are missing after you used another computer or tab.** The save was refused because the file was newer. Your local copy was kept in `data/conflicts/conflict-<time>.json`, with a `reason` line saying why. The app does not import these files. To recover something, open the file and copy the entries you need into `data/school-data.json` by hand, then restart the server.
+It builds a `public` branch from the current commit without `data/`, with a neutral author (`PUBLIC_AUTHOR_NAME`, `PUBLIC_AUTHOR_EMAIL`), and clones or updates it in the target folder (default `../school-app-public`). It refuses to finish if the files contain your git user name or email, or a word from the git-ignored `tools/private-words.txt`. Nothing on disk is deleted.
