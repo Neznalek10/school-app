@@ -24,6 +24,7 @@ import { chemView, chemQuizView } from './views/chem.js';
 import { exerciseView } from './views/exercises.js';
 import { setupView } from './views/setup.js';
 import { syncState, onSyncChange, dismissConflictNotice } from './sync/engine.js';
+import { announceUpdate, watchForUpdates } from './update.js';
 
 const ROUTES = {
   accounts: accountsView,
@@ -242,6 +243,14 @@ function renderShell() {
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {});
+  announceUpdate(sessionStorage, app.version, message => app.toast(message, { kind: 'success' }));
+  watchForUpdates({
+    sw: navigator.serviceWorker,
+    doc: document,
+    session: sessionStorage,
+    version: app.version,
+    reload: () => location.reload(),
+  });
 }
 
 /** How long the conflict notice stays on screen, in milliseconds (longer than a normal toast). */

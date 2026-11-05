@@ -18,6 +18,7 @@ const TEST_FILES = [
   'setup.test.mjs',
   'subjects.test.mjs',
   'backup.test.mjs',
+  'update.test.mjs',
   'ai.test.mjs',
   'apps.test.mjs',
   'integration.test.mjs',
