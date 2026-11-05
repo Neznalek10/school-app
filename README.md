@@ -1,4 +1,4 @@
-# School
+# School-app
 
 A study hub for one student: your subjects, notes, tests and homework, AI assistants that know how your class works, and practice apps for languages, chemistry naming and maths. Everything runs on your own computer. Your progress is saved in one readable file that you can back up or move to another computer with git.
 
