@@ -1,0 +1,23 @@
+# Secrets: API keys live only here, never in git
+.env
+# Other .env variants (.env.local and so on) stay private too; the documented example is tracked
+.env.*
+!.env.example
+
+# Temporary files left behind by an interrupted data or conflict save (the data folder itself is tracked on purpose)
+data/**/*.tmp
+
+# Private words that tools/make-public.sh refuses to publish (one per line); never committed
+tools/private-words.txt
+
+# Python
+venv/
+__pycache__/
+
+# Editors and OS
+node_modules/
+*.log
+.DS_Store
+
+# Personal progress data is never published
+data/
