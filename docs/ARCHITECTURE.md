@@ -62,7 +62,7 @@ Two rules shape everything else:
 | `js/ai.js`, `js/study.js` | AI client (OpenRouter, Ollama, LM Studio), system and copy-paste prompts, subject profile, lesson templates. |
 | `js/views/account.js` | Account page: AI settings, the Storage card (mode, last save, "Save now"), "Forget key". |
 | `js/apps.js` | Registry of the embedded apps (French and English): path, storage prefix, language. |
-| `apps/french`, `apps/vocab` | The two language apps. Each has its own store and prefix, and loads `js/sync/page.js` with one script tag. |
+| `apps/french`, `apps/vocab` | The two language apps. Each has its own store and prefix, and loads `js/sync/page.js` with one script tag. `apps/french` is the whole standalone language app (2.1.0) with a few school hooks: `js/embed.js` (profile and the School link), the `school-fr.` prefix, the root sync engine instead of its own, `../../api/` in its service worker, and the key and backup safety rules in `js/ai.js` and `js/backup.js`. |
 
 ### Other
 

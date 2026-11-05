@@ -8,7 +8,7 @@ import { aiSettings, catalogOf, customOf } from './write.js';
 const LEVELS = ['A1', 'A2', 'B1'];
 const COPY = {
   write: { title: 'New writing topic', placeholder: 'For example: a message to my cousin about our trip to Berlin', verb: 'write about' },
-  speak: { title: 'New speaking topic', placeholder: 'For example: arguing with a friend about the best CS2 map', verb: 'talk about' },
+  speak: { title: 'New speaking topic', placeholder: 'For example: arguing with a friend about the best video game', verb: 'talk about' },
 };
 
 // Asks the AI for one topic, saves it under "My topics" and hands it to onDone.
