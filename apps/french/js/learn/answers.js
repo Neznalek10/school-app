@@ -3,7 +3,7 @@ import { html } from '../ui.js';
 
 const MAX_VARIANTS = 200;
 
-// "{Je m'appelle|Mon nom est} User." -> both sentences. "{|très }bien" makes a part optional.
+// "{Je m'appelle|Mon nom est} Hugo." -> both sentences. "{|très }bien" makes a part optional.
 export function expand(pattern) {
   let out = [''];
   for (const part of String(pattern).split(/(\{[^{}]*\})/)) {
