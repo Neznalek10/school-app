@@ -9,6 +9,7 @@ The 1.x history lived in the earlier project (school-learning-app). This file st
 ### Changed
 
 - The installed app on Android opens full-screen: the status bar and the back, home and recents buttons hide, and a swipe from the edge brings them back. iPhone and iPad keep the normal home-screen view.
+- GitHub Pages is published by `.github/workflows/pages.yml` instead of the built-in branch deploy.
 
 ## [2.0.0] - 2026-11-05
 
