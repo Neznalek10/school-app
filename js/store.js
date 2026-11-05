@@ -8,6 +8,7 @@
  */
 import { defaultSubjects, addLaterDefaults, LATER_DEFAULTS } from './subjects.js';
 import { migrateEvents } from './events.js';
+import { CZECH, defaultCountry } from './holidays.js';
 
 const PREFIX = 'school.';
 const memory = {};
@@ -17,6 +18,8 @@ const DEFAULT_SETTINGS = {
   theme: 'system',
   ai: { ...DEFAULT_AI },
   aiLanguage: 'en',
+  // Accounts from before the country setting all used the Czech calendar; new ones get the browser's country.
+  country: CZECH,
   czech: { holidays: true, important: true, district: '' },
   lastBackup: null,
 };
@@ -77,7 +80,7 @@ export const store = {
     write(`${account.id}.subjects`, defaultSubjects());
     // Nothing is added later to a brand new account, so record every later default as handled.
     // The AI block is stored from the start so a key from .env has a config object to be filled into.
-    write(`${account.id}.settings`, { addedDefaults: [...LATER_DEFAULTS], ai: { ...DEFAULT_AI } });
+    write(`${account.id}.settings`, { addedDefaults: [...LATER_DEFAULTS], ai: { ...DEFAULT_AI }, country: defaultCountry() });
     return account;
   },
   nameTaken(name) {

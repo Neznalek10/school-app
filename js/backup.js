@@ -7,6 +7,7 @@
  * are not objects with an id.
  */
 import { ACCOUNT_KEYS } from './store.js';
+import { COUNTRIES } from './holidays.js';
 
 export const BACKUP_FORMAT = 1;
 export const BACKUP_KEYS = ACCOUNT_KEYS;
@@ -94,6 +95,8 @@ function cleanSettings(settings) {
     if (typeof settings[key] === type) clean[key] = settings[key];
   }
   if (isObject(settings.czech)) clean.czech = settings.czech;
+  // A country outside the list would make the calendar ask Nager.Date for something it doesn't have.
+  if (settings.country === '' || COUNTRIES.includes(settings.country)) clean.country = settings.country;
   if (Array.isArray(settings.addedDefaults)) clean.addedDefaults = settings.addedDefaults.filter(v => typeof v === 'string');
   return clean;
 }
