@@ -1,5 +1,6 @@
 import { plainText } from '../md.js';
 import { html, icon } from '../ui.js';
+import { formatDate } from '../locale.js';
 
 export function timeAgo(t, now = Date.now()) {
   const min = Math.round((now - t) / 60000);
@@ -10,7 +11,7 @@ export function timeAgo(t, now = Date.now()) {
   const d = Math.round(h / 24);
   if (d === 1) return 'yesterday';
   if (d < 30) return `${d} days ago`;
-  return new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return formatDate(t, { day: 'numeric', month: 'short' });
 }
 
 export const subjectIcon = (s, cls = '') => html`<span class="subject-icon c-${s.color} ${cls}">${icon(s.icon)}</span>`;

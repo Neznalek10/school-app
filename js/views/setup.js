@@ -15,6 +15,7 @@ import { aiReady, aiSettings, externalPrompt } from '../ai.js';
 import { SUBJECT_ICONS } from '../subjects.js';
 import { setupAssistant, parseSetup, setupSummary } from '../setup.js';
 import { html, icon } from '../ui.js';
+import { bindDraft } from '../drafts.js';
 import { subjectIcon, copyText } from './parts.js';
 import { applySetupAndSave, setupAppliedText, summaryItem } from './setup-apply.js';
 
@@ -74,7 +75,7 @@ function outsideCard() {
       ${OUTSIDE_AI.map(([label, url]) => html`<a class="btn btn-secondary" href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`)}
     </div>
     <label class="field-label" for="setup-paste">Paste the answer</label>
-    <textarea class="input textarea setup-paste" id="setup-paste" rows="6" placeholder="Paste the whole answer of the AI here" spellcheck="false"></textarea>
+    <textarea class="input textarea setup-paste" id="setup-paste" name="answer" rows="6" placeholder="Paste the whole answer of the AI here" spellcheck="false"></textarea>
     <p class="setup-status" role="status" hidden></p>
     <ul class="setup-preview" hidden></ul>
     <button class="btn btn-primary btn-block" type="button" data-apply disabled>${icon('check')}Apply</button>
@@ -123,6 +124,8 @@ function mountPaste(app, subject, root) {
     preview.hidden = false;
     apply.disabled = false;
   });
+  // Bound after the input listener, so a restored answer is checked and previewed at once.
+  const draft = bindDraft(paste.parentElement, `setup:${subject.id}`);
 
   apply.addEventListener('click', () => {
     if (!setup || apply.disabled) return;
@@ -130,6 +133,7 @@ function mountPaste(app, subject, root) {
     apply.disabled = true;
     try {
       app.toast(setupAppliedText(subject, applySetupAndSave(app, subject, setup)), { kind: 'success' });
+      draft.clear();
     } catch (error) {
       apply.disabled = false;
       return say(error.message, true);

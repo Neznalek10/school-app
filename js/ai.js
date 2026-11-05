@@ -9,6 +9,7 @@
 import { store, DEFAULT_AI } from './store.js';
 import { typeOf, firstLine } from './events.js';
 import { profileLine } from './study.js';
+import { fillStudent, studentText } from './locale.js';
 
 export { DEFAULT_AI, profileLine };
 export const aiSettings = () => ({ ...DEFAULT_AI, ...store.settings.ai });
@@ -143,7 +144,25 @@ export function httpError(status, body = '', secret = '') {
   return new AiError('http', `The AI answered with an error (${status}).${detail ? ` ${detail}` : ''}`);
 }
 
-const LANGUAGES = { en: 'English', cs: 'Czech' };
+/** Languages the assistants can answer in (ISO 639-1 codes); the names come from the browser. */
+export const AI_LANGUAGES = 'en cs sk de fr es it pt pl nl sv da nb fi hu ro bg hr sl sr uk ru el tr ar he hi zh ja ko vi id'.split(' ');
+
+/**
+ * A language's English name, as written into prompts: "cs" gives "Czech".
+ *
+ * @param {string} code Language code.
+ * @param {string} [inLanguage] Language to name it in; "en" for prompts, the code itself for a native name.
+ * @returns {string} The name, or "English" for an unknown code.
+ */
+export function languageName(code, inLanguage = 'en') {
+  if (!AI_LANGUAGES.includes(code)) return 'English';
+  try {
+    const name = new Intl.DisplayNames([inLanguage], { type: 'language' }).of(code) || code;
+    return name.charAt(0).toLocaleUpperCase(inLanguage) + name.slice(1);
+  } catch {
+    return code;
+  }
+}
 
 // Newest notes first; whatever doesn't fit the budget is left out and the model is told so.
 export function notesContext(notes, budget = NOTES_BUDGET) {
@@ -195,7 +214,7 @@ export function notesBlock(subject, notes, budget, { external = false } = {}) {
 }
 
 /** The assistant's prompt with its {subject} placeholder filled; a function replacer keeps `$&` in a subject name literal. */
-const fillSubject = (assistant, subject) => assistant.prompt.replaceAll('{subject}', () => subject.name);
+const fillSubject = (assistant, subject) => fillStudent(assistant.prompt.replaceAll('{subject}', () => subject.name));
 
 /**
  * System message for the in-app chat: role, subject profile, language, tests and notes.
@@ -207,7 +226,7 @@ export function systemPrompt({ assistant, subject, notes, events = [], language 
   return [
     fillSubject(assistant, subject),
     profileLine(subject),
-    `Always answer in ${LANGUAGES[language] || 'English'}, unless the student writes in another language and asks you to switch. Use Markdown: short paragraphs, bullet lists and **bold** key terms.`,
+    `Always answer in ${languageName(language)}, unless the student writes in another language and asks you to switch. Use Markdown: short paragraphs, bullet lists and **bold** key terms.`,
     upcomingLines(subject, events),
     notesBlock(subject, notes, NOTES_BUDGET),
   ].filter(Boolean).join('\n\n');
@@ -227,10 +246,10 @@ export function externalPrompt({ assistant, subject, notes = [], events = [], la
     ? 'I will paste my notes in my next message. Reply with one short sentence asking for them.'
     : assistant.kickoff || 'Reply with one short sentence saying you are ready, then wait for my first message.';
   return [
-    `I am a Czech gymnázium student. This message sets up our chat about ${subject.name}. Your role:`,
+    `I am ${studentText()}. This message sets up our chat about ${subject.name}. Your role:`,
     fillSubject(assistant, subject),
     profileLine(subject),
-    `Always answer in ${LANGUAGES[language] || 'English'}, unless I ask you to switch. Use short paragraphs, bullet lists and **bold** key terms.`,
+    `Always answer in ${languageName(language)}, unless I ask you to switch. Use short paragraphs, bullet lists and **bold** key terms.`,
     upcomingLines(subject, events),
     notesBlock(subject, notes, EXTERNAL_NOTES_BUDGET, { external: true }),
     start,

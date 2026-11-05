@@ -9,6 +9,7 @@ import { parseSetup, setupSummary } from '../setup.js';
 import { markdown, plainText } from '../md.js';
 import { upcoming, typeOf, isTask, formatDay } from '../events.js';
 import { html, raw, icon, plural } from '../ui.js';
+import { bindDraft } from '../drafts.js';
 import { subjectIcon, copyText } from './parts.js';
 import { applySetupAndSave, setupAppliedText, summaryItem } from './setup-apply.js';
 
@@ -178,6 +179,7 @@ export function chatView(app, { id, sub, note, event }) {
     mount(root, topbar) {
       const form = root.querySelector('.composer');
       const input = form.text;
+      const draft = bindDraft(form, `chat:${key}`, { quiet: true });
       const log = root.querySelector('.chat-log');
       const here = () => location.hash.startsWith(`#/chat/${encodeURIComponent(subject.id)}/${encodeURIComponent(assistant.id)}`);
       requestAnimationFrame(() => { if (state.messages.length) log.lastElementChild?.scrollIntoView({ block: 'end' }); });
@@ -216,6 +218,8 @@ export function chatView(app, { id, sub, note, event }) {
       const send = text => {
         const content = text.trim();
         if (!content || app.pending[key]) return;
+        // Cleared before run() re-renders, or the new message box would restore the sent text.
+        draft.clear();
         state.messages.push({ role: 'user', content, at: Date.now() });
         state.updated = Date.now();
         store.save('chats');
