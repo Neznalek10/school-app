@@ -4,6 +4,12 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 The 1.x history lived in the earlier project (school-learning-app). This file starts at 2.0.0.
 
+## [2.0.1] - 2026-11-05
+
+### Changed
+
+- The installed app on Android opens full-screen: the status bar and the back, home and recents buttons hide, and a swipe from the edge brings them back. iPhone and iPad keep the normal home-screen view.
+
 ## [2.0.0] - 2026-11-05
 
 ### Added
