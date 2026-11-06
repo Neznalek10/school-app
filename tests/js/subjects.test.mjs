@@ -1,50 +1,64 @@
 /**
  * Tests for js/subjects.js, js/soustavy.js (addBuiltInLesson) and the account defaults in js/store.js.
  *
- * Responsibility: protect the Languages-only defaults (AC1), the starter kits (AC2), hasTool, assistantsOf,
- * the addLaterDefaults guard and the once-per-subject built-in lesson. No network; store.js falls back to
+ * Responsibility: protect the empty defaults, the starter kits (including the French and English kits with
+ * their apps), hasTool, assistantsOf, the addLaterDefaults guard and the once-per-subject built-in lesson. No network; store.js falls back to
  * its in-memory storage under gjs, so nothing touches real browser data.
  */
 import { test, assert } from './harness.mjs';
 import { TEMPLATES } from '../../js/study.js';
 import { SETUP_ID, SETUP_TOOLS, SETUP_LESSONS, applySetup } from '../../js/setup.js';
 import {
-  KITS, kitsFor, COLORS, SUBJECT_ICONS, PRESETS, LATER_DEFAULTS, LEGACY_TOOLS,
+  KITS, APP_OPTIONS, kitsFor, COLORS, SUBJECT_ICONS, PRESETS, LATER_DEFAULTS, LEGACY_TOOLS,
   defaultSubjects, subjectFromKit, hasTool, assistantsOf, addLaterDefaults,
 } from '../../js/subjects.js';
 import { addBuiltInLesson } from '../../js/soustavy.js';
 import { store } from '../../js/store.js';
 
-test('a new account starts with exactly one subject, Languages, with both language apps', () => {
-  const subjects = defaultSubjects();
-  assert.equal(subjects.length, 1);
-  assert.equal(subjects[0].id, 'languages');
-  assert.deepEqual(subjects[0].apps, ['french', 'english']);
+test('a new account starts with no subjects', () => {
+  assert.deepEqual(defaultSubjects(), []);
 });
 
-test('defaultSubjects returns fresh objects each call', () => {
+test('defaultSubjects returns a fresh array each call', () => {
   const a = defaultSubjects();
-  a[0].apps.push('x');
-  assert.deepEqual(defaultSubjects()[0].apps, ['french', 'english']);
+  a.push({ id: 'x' });
+  assert.deepEqual(defaultSubjects(), []);
 });
 
-test('createAccount records addedDefaults and useAccount loads one subject', () => {
+test('createAccount records addedDefaults and useAccount loads no subjects', () => {
   const account = store.createAccount('Subjects test user');
   assert.ok(store.useAccount(account.id));
-  assert.equal(store.subjects.length, 1);
+  assert.equal(store.subjects.length, 0);
   assert.deepEqual(store.settings.addedDefaults, []);
   assert.equal(store.lessons.length, 0);
 });
 
-test('there are eleven kits with unique ids, and each kit points at a real template, icon and colour', () => {
-  assert.equal(KITS.length, 11);
-  assert.equal(new Set(KITS.map(k => k.id)).size, 11);
+test('there are thirteen kits with unique ids, and each kit points at a real template, icon, colour and app', () => {
+  assert.equal(KITS.length, 13);
+  assert.equal(new Set(KITS.map(k => k.id)).size, 13);
   for (const kit of KITS) {
     assert.ok(Object.hasOwn(TEMPLATES, kit.plan), `plan of ${kit.id}`);
     assert.ok(SUBJECT_ICONS.includes(kit.icon), `icon of ${kit.id}`);
     assert.ok(COLORS.includes(kit.color), `colour of ${kit.id}`);
     for (const tool of kit.tools || []) assert.ok(Object.hasOwn(SETUP_TOOLS, tool), `tool ${tool}`);
     for (const lesson of kit.lessons || []) assert.ok(Object.hasOwn(SETUP_LESSONS, lesson), `lesson ${lesson}`);
+    for (const app of kit.apps || []) assert.ok(Object.hasOwn(APP_OPTIONS, app), `app ${app}`);
+  }
+});
+
+test('APP_OPTIONS describes the French course and the English vocabulary trainer', () => {
+  assert.deepEqual(Object.keys(APP_OPTIONS), ['french', 'english']);
+  assert.match(APP_OPTIONS.french, /French course/);
+  assert.match(APP_OPTIONS.english, /Vocabulary trainer/);
+});
+
+test('the French and English kits carry their apps and are offered in every country', () => {
+  const byId = Object.fromEntries(KITS.map(k => [k.id, k]));
+  assert.deepEqual(byId.french, { id: 'french', name: 'French', icon: 'globe', color: 'blue', plan: 'general', apps: ['french'] });
+  assert.deepEqual(byId.english, { id: 'english', name: 'English', icon: 'globe', color: 'cyan', plan: 'general', apps: ['english'] });
+  for (const czech of [true, false]) {
+    const ids = kitsFor(czech).map(k => k.id);
+    assert.ok(ids.includes('french') && ids.includes('english'), `czech=${czech}`);
   }
 });
 
@@ -57,10 +71,10 @@ test('kits carry the tools and lessons from AC2', () => {
 
 test('kitsFor offers the Czech kits to Czech accounts and neutral ones without Czech tools to others', () => {
   const czech = kitsFor(true).map(k => k.id);
-  assert.equal(czech.length, 9);
+  assert.equal(czech.length, 11);
   assert.ok(czech.includes('czech') && czech.includes('zsv') && !czech.includes('social'));
   const intl = Object.fromEntries(kitsFor(false).map(k => [k.id, k]));
-  assert.equal(Object.keys(intl).length, 9);
+  assert.equal(Object.keys(intl).length, 11);
   assert.ok(intl.language && intl.social && !intl.czech && !intl.zsv);
   assert.deepEqual(intl.chemistry.tools, []);
   assert.deepEqual(intl.informatics.lessons, []);
@@ -76,6 +90,16 @@ test('subjectFromKit with a kit prefills plan, kit id and tools', () => {
   });
   s.tools.push('x');
   assert.deepEqual(chem.tools, ['nazvoslovi']);
+});
+
+test('subjectFromKit copies the kit apps into the subject, never sharing the array', () => {
+  const french = KITS.find(k => k.id === 'french');
+  const s = subjectFromKit(french, { name: 'Français', icon: 'globe', color: 'blue', id: 's3', now: 2 });
+  assert.deepEqual(s.apps, ['french']);
+  s.apps.push('english');
+  assert.deepEqual(french.apps, ['french']);
+  const math = subjectFromKit(KITS.find(k => k.id === 'math'), { name: 'Maths', icon: 'math', color: 'violet', id: 's4' });
+  assert.deepEqual(math.apps, []);
 });
 
 test('subjectFromKit without a kit makes a plain subject', () => {
@@ -124,7 +148,7 @@ test('addLaterDefaults with no later defaults changes nothing and never inserts 
   const subjects = defaultSubjects();
   const result = addLaterDefaults(subjects, []);
   assert.deepEqual(result, { added: [], changed: false });
-  assert.equal(subjects.length, 1);
+  assert.equal(subjects.length, 0);
 });
 
 test('addLaterDefaults keeps already handled ids', () => {
@@ -165,7 +189,7 @@ test('addLaterDefaults records but never inserts an id that is missing from the 
   try {
     const result = addLaterDefaults(subjects, []);
     assert.deepEqual(result, { added: ['ghost'], changed: true });
-    assert.equal(subjects.length, 1);
+    assert.equal(subjects.length, 0);
     assert.ok(subjects.every(s => s && s.id));
   } finally {
     LATER_DEFAULTS.pop();

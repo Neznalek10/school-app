@@ -8,13 +8,16 @@
  */
 import { ACCOUNT_KEYS } from './store.js';
 import { COUNTRIES } from './holidays.js';
+import { MODES, cleanResult } from './testcheck.js';
+import { TOPIC_TITLE_MAX, TOPIC_DETAIL_MAX } from './curriculum.js';
+import { clip } from './text.js';
 
 export const BACKUP_FORMAT = 1;
 export const BACKUP_KEYS = ACCOUNT_KEYS;
 export const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
 
 /** Keys of `data` that hold lists of records. */
-const LIST_KEYS = ['subjects', 'notes', 'events', 'sources', 'lessons'];
+const LIST_KEYS = ['subjects', 'notes', 'events', 'sources', 'lessons', 'checks'];
 /** Keys of `data` that hold plain objects (kept as they are). */
 const OBJECT_KEYS = ['chats', 'chem'];
 /** Settings a backup may carry; `ai` is deliberately absent. */
@@ -57,7 +60,8 @@ export function backupFileName(name, now = new Date()) {
 
 /**
  * Tells whether a restored record is usable. Rules per list: every record is an object with a string id,
- * subjects also need a string name, sources and lessons may only carry http(s) links.
+ * subjects also need a string name, checks need valid fields and at least one usable question, sources and
+ * lessons may only carry http(s) links.
  *
  * @param {string} key List name, one of LIST_KEYS.
  * @param {unknown} record One entry from the file.
@@ -66,19 +70,58 @@ export function backupFileName(name, now = new Date()) {
 function isUsableRecord(key, record) {
   if (!isObject(record) || typeof record.id !== 'string') return false;
   if (key === 'subjects') return typeof record.name === 'string';
+  // The result screen and the lists read the cleaned fields, so a check that cannot be cleaned would break them.
+  if (key === 'checks') return cleanCheck(record) !== null;
   // A javascript: or data: address would run when the saved link is opened, so such sources are dropped.
   if (key === 'sources') return record.kind === 'link' ? isWebUrl(record.url) : !record.url || isWebUrl(record.url);
   return true;
 }
 
 /**
- * Cleans one record: lessons keep their progress but lose a link that is not http(s).
+ * Rebuilds a saved check from a file: fields are type-checked and the result goes through the same cleaning as a
+ * fresh AI answer, so the pages never meet a malformed question.
+ *
+ * @param {object} record A record with a string id.
+ * @returns {object|null} The cleaned check, or null when a field is wrong or no question survives.
+ */
+function cleanCheck(record) {
+  const { id, subjectId, eventId, mode, created, result } = record;
+  const valid = typeof subjectId === 'string' && typeof eventId === 'string' && MODES.includes(mode)
+    && Number.isFinite(created) && isObject(result) && Array.isArray(result.questions);
+  if (!valid) return null;
+  // The cleaner reads `confidence`, while a saved question stores the flag as `lowConfidence`.
+  const questions = result.questions.map(q => (isObject(q) ? { ...q, confidence: q.lowConfidence === true ? 'low' : 'high' } : q));
+  const cleaned = cleanResult({ ...result, questions });
+  return cleaned && { id, subjectId, eventId, mode, created, result: cleaned };
+}
+
+/**
+ * Keeps the usable topics of a subject outline: objects with a string id and title, a string detail, a boolean done.
+ *
+ * @param {unknown[]} topics The `topics` array from the file.
+ * @returns {{ id: string, title: string, detail: string, done: boolean }[]} Clean topics; unusable entries are dropped.
+ */
+function cleanTopics(topics) {
+  return topics
+    .filter(t => isObject(t) && typeof t.id === 'string' && typeof t.title === 'string')
+    .map(t => ({ id: t.id, title: clip(t.title, TOPIC_TITLE_MAX), detail: clip(t.detail, TOPIC_DETAIL_MAX), done: t.done === true }))
+    .filter(t => t.title);
+}
+
+/**
+ * Cleans one record: lessons keep their progress but lose a link that is not http(s); subjects keep only valid
+ * topics (a `topics` value that is not a list is dropped); checks are rebuilt by cleanCheck.
  *
  * @param {string} key List name, one of LIST_KEYS.
  * @param {object} record A record that passed isUsableRecord.
- * @returns {object} The record, or a copy with an empty link.
+ * @returns {object} The record, or a cleaned copy.
  */
 function cleanRecord(key, record) {
+  if (key === 'checks') return cleanCheck(record);
+  if (key === 'subjects' && 'topics' in record) {
+    const { topics, ...rest } = record;
+    return Array.isArray(topics) ? { ...rest, topics: cleanTopics(topics) } : rest;
+  }
   if (key === 'lessons' && record.link && !isWebUrl(record.link)) return { ...record, link: '' };
   return record;
 }
@@ -95,6 +138,8 @@ function cleanSettings(settings) {
     if (typeof settings[key] === type) clean[key] = settings[key];
   }
   if (isObject(settings.czech)) clean.czech = settings.czech;
+  // The student profile is kept whole; store.useAccount normalizes it when the account is opened.
+  if (isObject(settings.student)) clean.student = settings.student;
   // A country outside the list would make the calendar ask Nager.Date for something it doesn't have.
   if (settings.country === '' || COUNTRIES.includes(settings.country)) clean.country = settings.country;
   if (Array.isArray(settings.addedDefaults)) clean.addedDefaults = settings.addedDefaults.filter(v => typeof v === 'string');

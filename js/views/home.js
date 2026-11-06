@@ -10,9 +10,24 @@ import { eventRow, calendarHref, czRow } from './calendar.js';
 import { calendarItems, fetchMissingHolidays } from '../holidays.js';
 import { formatDate } from '../locale.js';
 
+/**
+ * Builds the hero card with today's language-app activity.
+ *
+ * Only apps that some subject lists in `subject.apps` are shown, each linking back to the first subject
+ * that holds it; an account whose subjects have no apps gets no hero at all.
+ *
+ * @param {object} app The app shell (unused beyond the signature shared by the home sections).
+ * @returns {object|string} An html fragment, or '' when no subject has an app.
+ */
 function languageHero(app) {
   const account = store.account;
-  const keys = Object.keys(APPS);
+  // First subject holding each known app, so the app's Home link returns to that subject's page.
+  const holder = {};
+  for (const subject of store.subjects) {
+    for (const key of subject.apps || []) if (APPS[key] && !holder[key]) holder[key] = subject;
+  }
+  const keys = Object.keys(holder);
+  if (!keys.length) return '';
   const stats = Object.fromEntries(keys.map(k => [k, appStats(k, account.id)]));
   const today = keys.reduce((n, k) => n + stats[k].today, 0);
   const best = Math.max(...keys.map(k => stats[k].streak));
@@ -22,7 +37,7 @@ function languageHero(app) {
     <div class="hero-figure">${fmt(today)}</div>
     <div class="hero-label">${today === 1 ? 'language answer today' : 'language answers today'}</div>
     <div class="hero-sub">${best ? `Best streak: ${plural(best, 'day')}` : 'A few minutes of French or English keeps a streak going'}</div>
-    <div class="hero-actions">${keys.map(k => html`<a class="btn btn-on-accent" href="${appUrl(k, account, '#/home')}">${APPS[k].flag} ${APPS[k].name}</a>`)}</div>
+    <div class="hero-actions">${keys.map(k => html`<a class="btn btn-on-accent" href="${appUrl(k, account, `#/subject/${encodeURIComponent(holder[k].id)}`)}">${APPS[k].flag} ${APPS[k].name}</a>`)}</div>
   </section>`;
 }
 
@@ -50,7 +65,14 @@ export function homeView(app) {
     ...daysOff.map(i => ({ date: i.start < today ? today : i.start, row: czRow(i, { today }) }))]
     .sort((a, b) => a.date.localeCompare(b.date));
 
+  // Accounts that have not finished the Get started questions are offered them here; nothing forces them.
   const body = html`
+    ${store.settings.student.done ? '' : html`<section class="card">
+      <header class="card-head"><h2>Tell the app about you</h2></header>
+      <p class="muted">Answer a few short questions about your age, school year and subjects. The AI then fits its answers to you and can plan every subject.</p>
+      <a class="btn btn-primary btn-block" href="#/welcome">${icon('sparkle')}Get started</a>
+    </section>`}
+
     ${languageHero(app)}
 
     ${coming.length ? html`<section class="card">

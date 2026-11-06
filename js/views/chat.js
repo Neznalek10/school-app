@@ -10,6 +10,7 @@ import { markdown, plainText } from '../md.js';
 import { upcoming, typeOf, isTask, formatDay } from '../events.js';
 import { html, raw, icon, plural } from '../ui.js';
 import { bindDraft } from '../drafts.js';
+import { clip } from '../text.js';
 import { subjectIcon, copyText } from './parts.js';
 import { applySetupAndSave, setupAppliedText, summaryItem } from './setup-apply.js';
 
@@ -193,6 +194,10 @@ export function chatView(app, { id, sub, note, event }) {
         state.error = null;
         app.pending[key] = true;
         app.render();
+        // "New chat" replaces state.messages, so a different array means this reply belongs to a cleared chat.
+        const thread = state.messages;
+        /** Tells whether the chat is still the one this request was sent from (false after "New chat"). */
+        const isCurrent = () => state.messages === thread;
         try {
           const messages = buildMessages({
             assistant,
@@ -203,15 +208,19 @@ export function chatView(app, { id, sub, note, event }) {
             history: state.messages.slice(-HISTORY),
           });
           const reply = await chat(ai, messages);
-          state.messages.push({ role: 'assistant', content: reply, at: Date.now() });
+          if (isCurrent()) thread.push({ role: 'assistant', content: reply, at: Date.now() });
         } catch (e) {
-          state.error = e instanceof AiError ? e.message : 'Something went wrong while asking the AI.';
+          if (isCurrent()) state.error = e instanceof AiError ? e.message : 'Something went wrong while asking the AI.';
         } finally {
-          delete app.pending[key];
-          state.updated = Date.now();
-          store.save('chats');
-          if (here()) app.render();
-          else if (!state.error) app.toast(`${assistant.name} answered in ${subject.name}.`, { kind: 'success' });
+          // After a reset the reply or error is dropped, and the reset already cleared the pending flag
+          // (a new request may be running by now).
+          if (isCurrent()) {
+            delete app.pending[key];
+            state.updated = Date.now();
+            store.save('chats');
+            if (here()) app.render();
+            else if (!state.error) app.toast(`${assistant.name} answered in ${subject.name}.`, { kind: 'success' });
+          }
         }
       };
 
@@ -273,7 +282,7 @@ export function chatView(app, { id, sub, note, event }) {
         if (save) {
           const i = Number(save.dataset.save);
           const question = [...state.messages.slice(0, i)].reverse().find(m => m.role === 'user');
-          const title = `${assistant.name}: ${plainText(question?.content || subject.name).slice(0, 60)}`;
+          const title = `${assistant.name}: ${clip(plainText(question?.content || subject.name), 60)}`;
           app.newNote(subject.id, { title, body: state.messages[i].content });
           app.toast(`Saved to your ${subject.name} notes.`, { kind: 'success' });
         }
@@ -315,6 +324,8 @@ export function chatView(app, { id, sub, note, event }) {
         if (!ok) return;
         state.messages = [];
         state.error = null;
+        // A request still running for the old chat must not keep the typing dots or block the next message.
+        delete app.pending[key];
         store.save('chats');
         app.render();
       });
