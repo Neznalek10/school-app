@@ -13,6 +13,8 @@ import {
 } from '../../js/setup.js';
 
 const ICONS = ['book', 'bulb', 'target'];
+/** Parse options for a Czech account, the only kind that keeps the Czech-only tools and lessons. */
+const CZECH = { icons: ICONS, czech: true };
 const PROFILE = 'Chemistry in class 1.A: the textbook plus teacher presentations, written tests with naming tasks, strict on units.';
 
 /** Returns an id generator that yields c1, c2, ... */
@@ -46,12 +48,19 @@ test('setupAssistant is a preset setup assistant with the subject in its prompt'
   assert.ok(a.prompt.includes('"Chemistry"'));
 });
 
-test('prompt demands one question per message and accepts done and hotovo', () => {
+test('prompt demands one question per message and accepts "done" in any language', () => {
   const p = setupPrompt({ name: 'Physics' });
   assert.match(p, /exactly one question per message/);
-  assert.match(p, /"done" or "hotovo"/);
+  assert.match(p, /"done" \(or the same word in their own language\)/);
+  assert.ok(!p.includes('hotovo'));
   assert.match(p, /ONE ```json code block/);
   for (const topic of ['sources', 'tests look', 'teacher', 'hard', 'goals', 'language']) assert.match(p, new RegExp(topic));
+});
+
+test('prompt names general sources, not Google Classroom', () => {
+  const p = setupPrompt({ name: 'Physics' });
+  assert.ok(p.includes('(textbook, worksheets, presentations, an online classroom)'));
+  assert.ok(!p.includes('Google'));
 });
 
 test('prompt lists every template with label and hint, every tool and lesson', () => {
@@ -67,8 +76,18 @@ test('outside the Czech Republic the prompt offers no Czech tools and describes 
   setLocale({ language: 'en', country: 'DE' });
   const p = setupPrompt({ name: 'Physics' });
   for (const key of Object.keys({ ...SETUP_TOOLS, ...SETUP_LESSONS })) assert.ok(!p.includes(`"${key}":`), key);
-  assert.ok(p.includes('a secondary school student in Germany'));
-  assert.ok(!p.includes('gymnázium'));
+  assert.ok(p.includes('a school student in Germany'));
+  assert.ok(!p.includes('gymnázium') && !p.includes('secondary school student'));
+  setLocale({ language: 'en', country: '' });
+});
+
+test('prompt describes the student from the profile and adds the audience line for a young student', () => {
+  setLocale({ language: 'en', country: 'DE', student: { age: 7, year: 2, stage: 'primary' } });
+  const p = setupPrompt({ name: 'Maths' });
+  assert.ok(p.includes('for a 7-year-old student in year 2 of primary school in Germany.'));
+  assert.ok(p.includes('The student is about 7 years old and still learning to read and write'));
+  setLocale({ language: 'en', country: 'DE', student: { age: 17 } });
+  assert.ok(!setupPrompt({ name: 'Maths' }).includes('The student is about'));
   setLocale({ language: 'en', country: '' });
 });
 
@@ -79,7 +98,7 @@ test('prompt quotes the current profile only when there is one and has no subjec
 });
 
 test('parseSetup reads a reply with prose before the block', () => {
-  const s = parseSetup(reply(GOOD), { icons: ICONS });
+  const s = parseSetup(reply(GOOD), CZECH);
   assert.equal(s.profile, PROFILE);
   assert.deepEqual(s.plan, { template: 'research', extra: 'Stress naming rules.' });
   assert.equal(s.assistants[0].icon, 'target');
@@ -89,7 +108,7 @@ test('parseSetup reads a reply with prose before the block', () => {
 
 test('parseSetup repairs curly quotes and trailing commas', () => {
   const raw = `{ “profile”: “${PROFILE}”, “plan”: { “template”: “math”, “extra”: “”, }, “assistants”: [], “tools”: [], “lessons”: [“soustavy”,], }`;
-  const s = parseSetup(`Here you go:\n${raw}`, { icons: ICONS });
+  const s = parseSetup(`Here you go:\n${raw}`, CZECH);
   assert.equal(s.plan.template, 'math');
   assert.deepEqual(s.lessons, ['soustavy']);
 });
@@ -118,7 +137,7 @@ test('parseSetup gives unknown icons bulb and trims long fields', () => {
 });
 
 test('parseSetup drops unknown tools and lessons, duplicates and ignores extra fields', () => {
-  const s = parseSetup(reply({ ...GOOD, tools: ['nazvoslovi', 'nazvoslovi', 'hack', 5], lessons: 'soustavy', mood: 'happy' }), { icons: ICONS });
+  const s = parseSetup(reply({ ...GOOD, tools: ['nazvoslovi', 'nazvoslovi', 'hack', 5], lessons: 'soustavy', mood: 'happy' }), CZECH);
   assert.deepEqual(s.tools, ['nazvoslovi']);
   assert.deepEqual(s.lessons, []);
   assert.ok(!('mood' in s));
@@ -141,7 +160,7 @@ test('parseSetup works with Czech text in the profile', () => {
 
 test('applySetup sets profile, plan, tools, setupAt and returns lessons', () => {
   const subject = { id: 's1', name: 'Chemistry', assistants: [] };
-  const setup = parseSetup(reply({ ...GOOD, lessons: ['soustavy'] }), { icons: ICONS });
+  const setup = parseSetup(reply({ ...GOOD, lessons: ['soustavy'] }), CZECH);
   const result = applySetup(subject, setup, { now: 42, id: counter() });
   assert.equal(subject.profile, PROFILE);
   assert.deepEqual(subject.plan, { template: 'research', extra: 'Stress naming rules.' });
@@ -180,7 +199,7 @@ test('applySetup requires an id generator and fails on a stuck one', () => {
 });
 
 test('applySetup does not share arrays with the setup', () => {
-  const setup = parseSetup(reply(GOOD), { icons: ICONS });
+  const setup = parseSetup(reply(GOOD), CZECH);
   const subject = { name: 'X' };
   applySetup(subject, setup, { id: counter() });
   subject.tools.push('other');
@@ -188,7 +207,7 @@ test('applySetup does not share arrays with the setup', () => {
 });
 
 test('setupSummary shows the full profile, lesson instructions and every assistant prompt', () => {
-  const setup = parseSetup(reply({ ...GOOD, lessons: ['soustavy'] }), { icons: ICONS });
+  const setup = parseSetup(reply({ ...GOOD, lessons: ['soustavy'] }), CZECH);
   assert.deepEqual(setupSummary(setup), [
     `Profile: ${PROFILE}`,
     'Learning plan: Research',
@@ -214,7 +233,7 @@ test('applySetup only adds tools: existing ones stay and none is left undefined'
   applySetup(plain, none, { id: counter() });
   assert.ok(!('tools' in plain));
   const added = { name: 'Chemistry', tools: ['other'] };
-  applySetup(added, parseSetup(reply(GOOD), { icons: ICONS }), { id: counter() });
+  applySetup(added, parseSetup(reply(GOOD), CZECH), { id: counter() });
   assert.deepEqual(added.tools, ['other', 'nazvoslovi']);
 });
 
@@ -228,4 +247,48 @@ test('parseSetup asks for the final answer while the interview is still running'
   const message = /Paste the JSON block from the AI's final answer, once the interview has finished\./;
   assert.throws(() => parseSetup('What topics does your course cover?', { icons: ICONS }), message);
   assert.throws(() => parseSetup('', { icons: ICONS }), message);
+});
+
+test('parseSetup drops the Czech-only tools and lessons when the account is not Czech', () => {
+  const answer = reply({ ...GOOD, tools: ['nazvoslovi'], lessons: ['soustavy'] });
+  const abroad = parseSetup(answer, { icons: ICONS, czech: false });
+  assert.deepEqual([abroad.tools, abroad.lessons], [[], []]);
+  const home = parseSetup(answer, CZECH);
+  assert.deepEqual([home.tools, home.lessons], [['nazvoslovi'], ['soustavy']]);
+});
+
+test('parseSetup takes the Czech gate from the account country when the option is missing', () => {
+  const answer = reply({ ...GOOD, tools: ['nazvoslovi'] });
+  setLocale({ language: 'en', country: 'CZ' });
+  assert.deepEqual(parseSetup(answer, { icons: ICONS }).tools, ['nazvoslovi']);
+  setLocale({ language: 'en', country: 'DE' });
+  assert.deepEqual(parseSetup(answer, { icons: ICONS }).tools, []);
+  setLocale({ language: 'en', country: '' });
+});
+
+test('parseSetup cuts long fields without splitting an emoji', () => {
+  const profile = `${'p'.repeat(1999)}😀 tail`;
+  const prompt = `You help. ${'x'.repeat(2989)}😀 tail`;
+  const s = parseSetup(reply({ ...GOOD, profile, assistants: [{ name: 'Helper', prompt }] }), { icons: ICONS });
+  assert.equal(s.profile, 'p'.repeat(1999) + '😀');
+  // 3000 code points: the emoji counts once but takes two UTF-16 units.
+  assert.equal(s.assistants[0].prompt.length, 3001);
+  assert.ok(s.assistants[0].prompt.endsWith('😀'));
+});
+
+test('applySetup leaves the subject untouched when the id generator is stuck', () => {
+  const subject = {
+    name: 'Chemistry', profile: 'old', plan: { template: 'history' }, tools: ['other'], setupAt: 1,
+    assistants: [{ id: 'own', name: 'Mine', prompt: 'x' }, { id: 'old', name: 'Old', fromSetup: true, prompt: 'y' }],
+  };
+  const before = JSON.parse(JSON.stringify(subject));
+  const setup = parseSetup(reply(GOOD), CZECH);
+  assert.throws(() => applySetup(subject, setup, { id: () => 'tutor' }), /unique assistant id/);
+  assert.deepEqual(subject, before);
+});
+
+test('applySetup leaves the subject untouched when there is no id generator', () => {
+  const subject = { name: 'X', profile: 'old' };
+  assert.throws(() => applySetup(subject, parseSetup(reply(GOOD), CZECH)), TypeError);
+  assert.deepEqual(subject, { name: 'X', profile: 'old' });
 });

@@ -1,7 +1,9 @@
 /**
  * Integration tests written from the acceptance criteria (plan.md section 2), not from the implementation:
  * two "machines" syncing through one fake server (AC4, AC5, AC6, AC11), new accounts and starter kits
- * (AC1, AC2) and the subject setup flow reaching every prompt (AC3).
+ * (AC1, AC2) and the subject setup flow reaching every prompt (AC3). The last tests cover the
+ * onboarding profile, curriculum, prompts for young students, generalization, the photo test check and its
+ * saved results, again on the pure modules and the store.
  *
  * Where it fits: registered with the shared harness (tests/js/harness.mjs), run by tests/js/run.mjs under gjs
  * or node. The sync tests use the real snapshot.js, client.js (its error classes) and engine.js; only the
@@ -17,11 +19,17 @@ import { resetForTests, startSync } from '../../js/sync/engine.js';
 import { ConflictError, SyncHttpError } from '../../js/sync/client.js';
 import { META_KEY, readMeta, redactSecrets } from '../../js/sync/snapshot.js';
 import { store } from '../../js/store.js';
-import { KITS, COLORS, SUBJECT_ICONS, subjectFromKit, hasTool } from '../../js/subjects.js';
+import { KITS, COLORS, SUBJECT_ICONS, subjectFromKit, hasTool, kitsFor } from '../../js/subjects.js';
 import { addBuiltInLesson } from '../../js/soustavy.js';
-import { parseSetup, applySetup, setupAssistant } from '../../js/setup.js';
+import { parseSetup, applySetup, setupAssistant, setupPrompt } from '../../js/setup.js';
 import { profileLine, systemPrompt, externalPrompt } from '../../js/ai.js';
-import { promptFor } from '../../js/study.js';
+import { promptFor, cardsOf } from '../../js/study.js';
+import { setLocale, studentText, audienceText } from '../../js/locale.js';
+import { curriculumPrompt, parseCurriculum, applyCurriculum, plainSubjects } from '../../js/curriculum.js';
+import {
+  checkPrompt, parseCheck, checkStats, newCheck, parseRecheck, mistakeCards, addMistakeCards, MISTAKES_KIND,
+} from '../../js/testcheck.js';
+import { buildBackup, parseBackup } from '../../js/backup.js';
 
 /** Key under which the dashboard stores its AI settings in these tests. */
 const SETTINGS_KEY = 'school.a1.settings';
@@ -388,16 +396,14 @@ test('AC6: unsaved changes found at start-up against a newer file are kept as a 
 
 // ---------------------------------------------------------------- AC1, AC2: accounts and kits
 
-test('AC1: a new account starts with exactly one subject, Languages', () => {
+test('AC1: a new account starts with no subjects; the Get started interview adds them', () => {
   const account = store.createAccount('Integration user');
   assert.ok(store.useAccount(account.id));
-  assert.equal(store.subjects.length, 1);
-  assert.equal(store.subjects[0].id, 'languages');
-  assert.deepEqual(store.subjects[0].apps, ['french', 'english']);
+  assert.equal(store.subjects.length, 0);
 });
 
 test('AC2: every starter kit makes a valid subject; Chemistry gets the naming tool', () => {
-  assert.equal(KITS.length, 11);
+  assert.equal(KITS.length, 13);
   let counter = 0;
   for (const kit of KITS) {
     const subject = subjectFromKit(kit, { name: kit.name, icon: kit.icon, color: kit.color, id: `s${++counter}` });
@@ -445,7 +451,7 @@ const SETUP_REPLY = `Thank you, that is everything I needed. Here is the proposa
 \`\`\``;
 
 test('AC3: a parsed and applied setup puts the profile into every kind of prompt', () => {
-  const setup = parseSetup(SETUP_REPLY, { icons: SUBJECT_ICONS });
+  const setup = parseSetup(SETUP_REPLY, { icons: SUBJECT_ICONS, czech: true });
   const subject = subjectFromKit(null, { name: 'Physics', icon: 'atom', color: 'orange', id: 's-phys' });
   let counter = 0;
   const { lessons } = applySetup(subject, setup, { id: () => `c${++counter}` });
@@ -461,7 +467,7 @@ test('AC3: a parsed and applied setup puts the profile into every kind of prompt
 });
 
 test('AC3: applying the setup creates the custom assistant and the lesson list is ready to add', () => {
-  const setup = parseSetup(SETUP_REPLY, { icons: SUBJECT_ICONS });
+  const setup = parseSetup(SETUP_REPLY, { icons: SUBJECT_ICONS, czech: true });
   const subject = subjectFromKit(null, { name: 'Physics', icon: 'atom', color: 'orange', id: 's-phys' });
   const { lessons } = applySetup(subject, setup, { id: () => 'c1' });
   assert.equal(subject.assistants.length, 1);
@@ -470,4 +476,281 @@ test('AC3: applying the setup creates the custom assistant and the lesson list i
   assert.equal(subject.plan.template, 'physics');
   const stored = [];
   assert.equal(addBuiltInLesson(stored, subject.id, lessons[0]), true);
+});
+
+// ---------------------------------------------------------------- Round 2: onboarding, curriculum, test check
+
+/** A student profile for an 8-year-old in Germany, as the Get started interview saves it. */
+const YOUNG_PROFILE = { age: 8, year: 2, stage: 'primary', school: 'Grundschule Nord', subjects: ['Maths', 'German'], goals: 'Read faster', notes: '', done: false };
+
+/** A student profile for a 16-year-old: no age-fitting style line is added for them. */
+const TEEN_PROFILE = { age: 16, year: 10, stage: 'upper', school: '', subjects: ['Physics'], goals: '', notes: '', done: false };
+
+/** A realistic reply to the curriculum prompt: prose, then one fenced JSON block with three subjects. */
+const CURRICULUM_REPLY = `Here is a plan for the school year. I kept the topics close to what is typical for this level.
+
+\`\`\`json
+{
+  "subjects": [
+    {
+      "name": "maths",
+      "icon": "math",
+      "color": "violet",
+      "template": "math",
+      "profile": "Adding and subtracting to 100, the times tables, simple shapes. Tests are short written sums.",
+      "topics": [
+        { "title": "Numbers to 100", "detail": "Count, compare and order." },
+        { "title": "Adding and subtracting", "detail": "Without carrying first." },
+        { "title": "Times tables", "detail": "2, 5 and 10." },
+        { "title": "Shapes", "detail": "Circle, square, triangle." }
+      ],
+      "apps": []
+    },
+    {
+      "name": "French",
+      "icon": "rocket",
+      "color": "sparkly",
+      "template": "does-not-exist",
+      "profile": "First words and greetings.",
+      "topics": [ { "title": "Greetings", "detail": "Bonjour and salut." }, "Colours" ],
+      "apps": ["french", "klingon"]
+    },
+    {
+      "name": "Art",
+      "icon": "palette",
+      "color": "pink",
+      "template": "general",
+      "profile": "",
+      "topics": [ { "title": "Mixing colours", "detail": "" } ],
+      "apps": []
+    }
+  ]
+}
+\`\`\`
+
+Tell me if you want changes.`;
+
+/** An id generator that counts up, so applied records are predictable. */
+const counterIds = () => {
+  let counter = 0;
+  return () => `id${++counter}`;
+};
+
+/** Matches a high surrogate without a low one after it, or a low surrogate without a high one before it. */
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+/**
+ * Runs `body` and restores the default locale afterwards, so one test's profile never leaks.
+ *
+ * @param {Function} body The test body.
+ * @returns {*} Whatever `body` returns.
+ */
+function withLocaleReset(body) {
+  try {
+    return body();
+  } finally {
+    setLocale({ language: 'en' });
+  }
+}
+
+test('AC1: a new account saves a student profile through the store and keeps it normalized', () => withLocaleReset(() => {
+  const account = store.createAccount('Profile user');
+  assert.ok(store.useAccount(account.id));
+  assert.equal(store.subjects.length, 0);
+  store.saveStudent({ ...store.settings.student, ...YOUNG_PROFILE, age: '8', school: '  Grundschule   Nord ' });
+  assert.equal(store.settings.student.age, 8);
+  assert.equal(store.settings.student.school, 'Grundschule Nord');
+  assert.deepEqual(store.settings.student.subjects, ['Maths', 'German']);
+  // Opening the account again reads the saved profile back.
+  assert.ok(store.useAccount(account.id));
+  assert.equal(store.settings.student.year, 2);
+}));
+
+test('AC1: the curriculum prompt carries the profile text and the subjects', () => withLocaleReset(() => {
+  setLocale({ language: 'en', country: 'DE', student: YOUNG_PROFILE });
+  const text = studentText();
+  assert.ok(text.startsWith('an 8-year-old student in year 2 of primary school'), text);
+  const prompt = curriculumPrompt({ studentText: text, audience: audienceText(), subjects: YOUNG_PROFILE.subjects, goals: YOUNG_PROFILE.goals });
+  assert.ok(prompt.includes(text), 'student text');
+  assert.ok(prompt.includes('- Maths') && prompt.includes('- German'), 'subjects');
+  assert.ok(prompt.includes('Read faster'), 'goals');
+  assert.ok(prompt.includes(audienceText()), 'audience line');
+  assert.equal(prompt.match(/```json/g).length, 1);
+}));
+
+test('AC2: a realistic curriculum reply is parsed and applied: names, topics, apps, existing id kept', () => {
+  const curriculum = parseCurriculum(CURRICULUM_REPLY);
+  assert.deepEqual(curriculum.subjects.map(s => s.name), ['maths', 'French', 'Art']);
+  const french = curriculum.subjects[1];
+  assert.equal(french.icon, 'book', 'unknown icon');
+  assert.ok(COLORS.includes(french.color), 'unknown colour');
+  assert.equal(french.template, 'general', 'unknown template');
+  assert.deepEqual(french.apps, ['french'], 'bogus app key dropped');
+  assert.deepEqual(french.topics.map(t => t.title), ['Greetings', 'Colours']);
+
+  const subjects = [{ id: 'existing-maths', name: 'Maths', icon: 'book', color: 'red', apps: [], assistants: [], created: 1, topics: [{ id: 't0', title: 'Shapes', detail: '', done: true }] }];
+  const { added, updated } = applyCurriculum(subjects, curriculum, { id: counterIds(), now: 5 });
+  assert.deepEqual(updated, ['Maths']);
+  assert.deepEqual(added, ['French', 'Art']);
+  assert.equal(subjects.length, 3);
+  const maths = subjects[0];
+  assert.equal(maths.id, 'existing-maths');
+  assert.equal(maths.name, 'Maths', 'the existing name is kept');
+  assert.ok(maths.profile.startsWith('Adding and subtracting'));
+  assert.equal(maths.plan.template, 'math');
+  assert.equal(maths.topics.length, 4);
+  assert.equal(maths.topics.find(t => t.title === 'Shapes').done, true, 'a ticked topic stays ticked');
+  assert.equal(subjects[1].apps.includes('french'), true);
+  assert.equal(subjects[1].topics.length, 2);
+  assert.equal(subjects[2].profile, undefined, 'an empty profile is not set');
+});
+
+test('AC2: "create subjects without AI" adds only the missing names, ignoring case', () => {
+  const subjects = [{ id: 's1', name: 'maths', icon: 'math', color: 'blue', apps: [], assistants: [], created: 1 }];
+  const { added } = plainSubjects(subjects, ['Maths', 'German', 'german'], { id: counterIds(), now: 2 });
+  assert.deepEqual(added, ['German']);
+  assert.deepEqual(subjects.map(s => s.name), ['maths', 'German']);
+  assert.equal(subjects[1].kit, undefined);
+});
+
+test('AC3: for an 8-year-old in Germany every prompt carries the student text and the audience line', () => withLocaleReset(() => {
+  setLocale({ language: 'en', country: 'DE', student: YOUNG_PROFILE });
+  const text = studentText();
+  const audience = audienceText();
+  assert.ok(text.includes('8-year-old') && text.includes('Germany'), text);
+  assert.ok(audience.includes('about 8 years old'), audience);
+  const subject = subjectFromKit(null, { name: 'Maths', icon: 'math', color: 'blue', id: 's-m' });
+  subject.plan = { template: 'math' };
+  const assistant = setupAssistant(subject);
+  const prompts = {
+    system: systemPrompt({ assistant, subject, notes: [] }),
+    external: externalPrompt({ assistant, subject }),
+    lesson: promptFor(subject),
+    setup: setupPrompt(subject),
+  };
+  for (const [name, prompt] of Object.entries(prompts)) {
+    assert.ok(prompt.includes(audience), `${name} prompt has the audience line`);
+    assert.ok(prompt.includes('8-year-old'), `${name} prompt has the student text`);
+  }
+}));
+
+test('AC3: a 16-year-old\'s prompts have no audience line', () => withLocaleReset(() => {
+  setLocale({ language: 'en', country: 'DE', student: TEEN_PROFILE });
+  assert.equal(audienceText(), '');
+  assert.ok(studentText().includes('16-year-old'));
+  const subject = subjectFromKit(null, { name: 'Physics', icon: 'atom', color: 'orange', id: 's-p' });
+  const assistant = setupAssistant(subject);
+  for (const prompt of [systemPrompt({ assistant, subject, notes: [] }), externalPrompt({ assistant, subject }), promptFor(subject), setupPrompt(subject)]) {
+    assert.ok(!prompt.includes('The student is about'), 'no young-student style line');
+    assert.ok(prompt.includes('16-year-old'));
+  }
+}));
+
+test('AC9: outside the Czech Republic Czech-only tools and lessons are gone and no prompt assumes a gymnázium', () => withLocaleReset(() => {
+  const reply = SETUP_REPLY.replace('"tools": []', '"tools": ["nazvoslovi"]');
+  const setup = parseSetup(reply, { icons: SUBJECT_ICONS, czech: false });
+  assert.deepEqual(setup.tools, []);
+  assert.deepEqual(setup.lessons, []);
+  for (const kit of kitsFor(false)) {
+    assert.ok(!(kit.tools || []).some(tool => tool === 'nazvoslovi'), `tools of ${kit.id}`);
+    assert.ok(!(kit.lessons || []).includes('soustavy'), `lessons of ${kit.id}`);
+    assert.ok(!kit.czech, `${kit.id} is offered abroad`);
+  }
+  setLocale({ language: 'en', country: 'US' });
+  assert.equal(studentText(), 'a school student in the United States');
+  const text = studentText();
+  assert.ok(!/gymn[aá]zium/i.test(text) && !text.includes('secondary school'), text);
+}));
+
+/** A realistic reply to the check prompt: three questions, one hard to read, one with points, one blank. */
+const CHECK_REPLY = `I read all three photos. Here is the result.
+
+\`\`\`json
+{
+  "title": "Fractions test",
+  "summary": "Two questions were answered well; one needs revising.",
+  "focus": ["Adding fractions", "Common denominators"],
+  "questions": [
+    { "number": "1", "question": "1/2 + 1/4 = ?", "studentAnswer": "3/4", "correctAnswer": "3/4", "verdict": "correct",
+      "explanation": "1/2 is 2/4.", "tip": "Make the denominators equal first.", "points": { "earned": 2, "max": 2 } },
+    { "number": 2, "question": "2/3 + 1/6 = ?", "studentAnswer": "3/9", "correctAnswer": "5/6", "verdict": "wrong",
+      "explanation": "Do not add the denominators.", "tip": "Find the common denominator.", "confidence": "low", "points": { "earned": 0, "max": 3 } },
+    { "question": "Name the shape with 3 sides.", "studentAnswer": "", "correctAnswer": "Triangle", "verdict": "blank",
+      "explanation": "A triangle has three sides.", "tip": "Count the corners." }
+  ]
+}
+\`\`\``;
+
+test('AC6: a multi-question check reply is parsed, counted, saved to the store and survives a backup', () => withLocaleReset(() => {
+  const result = parseCheck(CHECK_REPLY);
+  assert.deepEqual(result.questions.map(q => q.number), ['1', '2', '3'], 'numbers: given as string, as number, defaulted');
+  assert.deepEqual(checkStats(result), {
+    total: 3, correct: 1, partial: 0, wrong: 1, blank: 1, unreadable: 0, lowConfidence: 1, earned: 2, max: 5,
+  });
+
+  const account = store.createAccount('Check user');
+  assert.ok(store.useAccount(account.id));
+  const record = newCheck({ subjectId: 's-m', eventId: 'e1', mode: 'check', result, id: 'chk1', now: 100 });
+  store.checks.unshift(record);
+  store.save('checks');
+  assert.ok(store.useAccount(account.id));
+  assert.equal(store.checks.length, 1, 'saved results are reloaded with the account');
+  assert.equal(store.checks[0].result.questions.length, 3);
+
+  const file = JSON.stringify(buildBackup(store, { name: 'Check user', version: 'test' }));
+  assert.ok(!file.includes('data:image') && !file.includes('image_url'), 'photos are never stored');
+  assert.deepEqual(Object.keys(store.checks[0]).sort(), ['created', 'eventId', 'id', 'mode', 'result', 'subjectId']);
+  const restored = parseBackup(file);
+  assert.equal(restored.data.checks.length, 1);
+  assert.deepEqual(restored.data.checks[0], record);
+}));
+
+test('AC6: the check prompt asks for the photos it was given and the student text', () => withLocaleReset(() => {
+  setLocale({ language: 'en', country: 'DE', student: YOUNG_PROFILE });
+  const prompt = checkPrompt({ subjectName: 'Maths', studentText: studentText(), audience: audienceText(), mode: 'check', photos: 3, external: true });
+  assert.ok(prompt.includes('I attached 3 photos'));
+  assert.ok(prompt.includes('8-year-old') && prompt.includes(audienceText()));
+}));
+
+test('E2: a rechecked question replaces one question and keeps its number', () => {
+  const result = parseCheck(CHECK_REPLY);
+  const reply = 'Corrected:\n```json\n{ "number": "99", "question": "2/3 + 1/6 = ?", "studentAnswer": "5/6", "correctAnswer": "5/6", "verdict": "correct", "explanation": "Right.", "tip": "Good." }\n```';
+  const fixed = parseRecheck(reply, result.questions[1].number);
+  assert.equal(fixed.number, '2');
+  assert.equal(fixed.verdict, 'correct');
+  const questions = result.questions.map(q => (q.number === fixed.number ? fixed : q));
+  assert.equal(questions.length, 3);
+  assert.equal(checkStats({ questions }).correct, 2);
+});
+
+test('E3: adding mistakes twice makes no duplicates and the lesson works as flashcards', () => {
+  const cards = mistakeCards(parseCheck(CHECK_REPLY));
+  assert.equal(cards.length, 2, 'the wrong and the blank question');
+  const lessons = [];
+  const ids = counterIds();
+  assert.equal(addMistakeCards(lessons, { subjectId: 's-m', subjectName: 'Maths', cards, id: ids, now: 1 }).added, 2);
+  assert.equal(addMistakeCards(lessons, { subjectId: 's-m', subjectName: 'Maths', cards, id: ids, now: 2 }).added, 0);
+  assert.equal(lessons.length, 1);
+  assert.equal(lessons[0].kind, MISTAKES_KIND);
+  const flashcards = cardsOf(lessons[0]);
+  assert.equal(flashcards.length, 2);
+  assert.ok(flashcards.every(card => card.lessonId === lessons[0].id));
+});
+
+test('AC12: clipped caps never leave a lone surrogate in a setup profile, a check question or a curriculum topic', () => {
+  const emoji = '\u{1F600}';
+  // 1999 or 599 or 79 ordinary characters, then an emoji straddling the cap, then more text.
+  const profile = `${'a'.repeat(1999)}${emoji}tail`;
+  const setup = parseSetup(JSON.stringify({ profile, plan: { template: 'general' } }), { icons: SUBJECT_ICONS, czech: false });
+  assert.ok(!LONE_SURROGATE.test(setup.profile), 'setup profile');
+  assert.ok(setup.profile.length > 0);
+
+  const question = `${'q'.repeat(599)}${emoji}tail`;
+  const check = parseCheck(JSON.stringify({ questions: [{ question, verdict: 'wrong', correctAnswer: 'x' }] }));
+  assert.ok(!LONE_SURROGATE.test(check.questions[0].question), 'check question');
+
+  const title = `${'t'.repeat(79)}${emoji}tail`;
+  const curriculum = parseCurriculum(JSON.stringify({ subjects: [{ name: 'Maths', topics: [{ title, detail: `${'d'.repeat(199)}${emoji}x` }] }] }));
+  assert.ok(!LONE_SURROGATE.test(curriculum.subjects[0].topics[0].title), 'curriculum topic title');
+  assert.ok(!LONE_SURROGATE.test(curriculum.subjects[0].topics[0].detail), 'curriculum topic detail');
 });

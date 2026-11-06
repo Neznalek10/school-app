@@ -1,5 +1,5 @@
 /**
- * Account page: profile, AI settings, calendar options, theme, storage status, backup and updates.
+ * Account page: profile, AI settings, calendar options, theme, storage status, backup and version.
  *
  * Responsibility: the #/account route. Settings are saved to store.settings on change; the Storage card
  * follows the shared sync state from js/sync/engine.js while the view is shown.
@@ -15,7 +15,8 @@ import { downloadBackup, pickBackupFile } from './backup-ui.js';
 import { DISTRICTS, SCHOOL_YEAR_RANGE } from '../czech.js';
 import { COUNTRIES, CZECH, countryName } from '../holidays.js';
 import { syncState, onSyncChange, syncNow, forgetKey } from '../sync/engine.js';
-import { formatDateTime, studentText, MAX_SCHOOL, UI_LANGUAGES, uiLanguage } from '../locale.js';
+import { formatDateTime, studentText, UI_LANGUAGES, uiLanguage } from '../locale.js';
+import { isStudentStarted } from '../student.js';
 import { tr } from '../i18n.js';
 
 /** Shown for the browser-only storage mode. */
@@ -28,11 +29,18 @@ function row(label, hint, control) {
   </div>`;
 }
 
-async function checkForUpdates(app) {
-  const reg = await navigator.serviceWorker?.getRegistration();
-  if (reg) await reg.update().catch(() => {});
-  app.toast('Reloading the latest version…');
-  setTimeout(() => location.reload(), 600);
+/**
+ * Builds the "About you" row: a one-line summary of the profile and a button that reopens the interview.
+ *
+ * @returns {object} An html fragment.
+ */
+function aboutYouRow() {
+  const student = store.settings.student;
+  const known = isStudentStarted(student) || !!store.settings.country;
+  // The summary starts a sentence, so its first letter is capitalised ("An 8-year-old student ...").
+  const text = studentText();
+  const summary = known ? text.charAt(0).toUpperCase() + text.slice(1) : 'Not filled in yet. The AI uses it to fit its answers to you.';
+  return row('About you', summary, html`<a class="btn btn-secondary btn-sm" href="#/welcome">${icon('edit')}Edit</a>`);
 }
 
 /**
@@ -123,9 +131,13 @@ export function accountView(app) {
       </div>
     </section>
 
+    <h3 class="group-title">About you</h3>
+    <section class="card settings">${aboutYouRow()}</section>
+
     <h3 class="group-title">AI assistants</h3>
     <section class="card settings ai-settings">
       <p class="muted small">Every subject's assistants use this. Your key stays on this device. Get a free key at openrouter.ai.</p>
+      <p class="muted small">OpenRouter accounts are for adults. If you are under 18, ask a parent to create the key.</p>
       <label class="field-label" for="ai-url">Address</label>
       <input id="ai-url" class="input" data-ai="url" value="${ai.url}" autocomplete="off" spellcheck="false" autocapitalize="off">
       <label class="field-label" for="ai-key">Key</label>
@@ -134,6 +146,9 @@ export function accountView(app) {
       <label class="field-label" for="ai-model">Model</label>
       <input id="ai-model" class="input" data-ai="model" value="${ai.model}" autocomplete="off" spellcheck="false" autocapitalize="off">
       <p class="muted small">"openrouter/free" picks a free model for you and quality varies. A fixed model gives steadier answers.</p>
+      <label class="field-label" for="ai-vision">Photo model</label>
+      <input id="ai-vision" class="input" data-ai="visionModel" value="${ai.visionModel || ''}" placeholder="Same as Model" autocomplete="off" spellcheck="false" autocapitalize="off">
+      <p class="muted small">Used to read photos of tests. Leave it empty to use the model above, if that model can read images.</p>
       <div class="setting-buttons">
         <button class="btn btn-secondary btn-sm" data-ai-preset="openrouter">OpenRouter</button>
         <button class="btn btn-secondary btn-sm" data-ai-preset="ollama">Ollama on this PC</button>
@@ -145,9 +160,6 @@ export function accountView(app) {
           ${AI_LANGUAGES.map(code => html`<option value="${code}" ${code === s.aiLanguage ? 'selected' : ''}>${languageName(code, code)} · ${languageName(code)}</option>`)}
         </select>
       </div>
-      <label class="field-label" for="ai-school">Your school and year</label>
-      <input id="ai-school" class="input" name="school" data-no-tr maxlength="${MAX_SCHOOL}" value="${s.school || ''}" placeholder="${studentText()}" autocomplete="off">
-      <p class="muted small">The assistants and lesson prompts use this to pitch their answers at your level. Leave it empty to use the text shown, which follows your country.</p>
     </section>
 
     <h3 class="group-title" id="calendar">Calendar</h3>
@@ -192,12 +204,12 @@ export function accountView(app) {
     <h3 class="group-title">Data</h3>
     <section class="card settings">
       ${row('Back up subjects, notes, calendar and sources', backupHint(s.lastBackup, syncState.mode), html`<div class="setting-buttons"><button class="btn btn-primary btn-sm" data-backup>${icon('download')}Back up</button><button class="btn btn-secondary btn-sm" data-restore>${icon('upload')}Restore</button></div>`)}
-      <p class="muted small settings-note">Uploaded files stay on this device and are not in the backup. French and English keep their own progress: back it up from Settings inside each app.</p>
+      <p class="muted small settings-note">Uploaded files stay on this device and are not in the backup. Built-in apps, such as the French course and the English vocabulary trainer, keep their own progress: back it up from Settings inside each app.</p>
     </section>
 
     <h3 class="group-title">About</h3>
     <section class="card settings">
-      ${row(`School · version ${app.version}`, 'If this is older than your latest push, check for updates', html`<button class="btn btn-secondary btn-sm" data-update>${icon('refresh')}Check for updates</button>`)}
+      ${row(`School · version ${app.version}`, 'Updates install by themselves when you open the app.', '')}
     </section>`;
 
   /**
@@ -265,11 +277,6 @@ export function accountView(app) {
         // Every screen was drawn in the old language, so the page starts again in the new one.
         location.reload();
       });
-      root.querySelector('[name=school]').addEventListener('change', e => {
-        s.school = e.target.value.trim().replace(/\s+/g, ' ').slice(0, MAX_SCHOOL);
-        store.save('settings');
-        app.toast('School saved.', { kind: 'success' });
-      });
       root.querySelector('[name=aiLanguage]').addEventListener('change', e => {
         s.aiLanguage = AI_LANGUAGES.includes(e.target.value) ? e.target.value : 'en';
         store.save('settings');
@@ -288,7 +295,7 @@ export function accountView(app) {
       });
       const field = name => root.querySelector(`[data-ai="${name}"]`);
       const saveAi = () => {
-        s.ai = Object.fromEntries(['url', 'key', 'model'].map(k => [k, field(k).value.trim()]));
+        s.ai = Object.fromEntries(['url', 'key', 'model', 'visionModel'].map(k => [k, field(k).value.trim()]));
         store.save('settings');
       };
       root.querySelectorAll('[data-ai]').forEach(input => input.addEventListener('change', saveAi));
@@ -296,6 +303,8 @@ export function accountView(app) {
         const ollama = btn.dataset.aiPreset === 'ollama';
         field('url').value = ollama ? 'http://localhost:11434/v1' : DEFAULT_AI.url;
         field('model').value = ollama ? 'llama3.1:8b' : DEFAULT_AI.model;
+        // A photo model chosen for the old address would not exist at the new one.
+        field('visionModel').value = '';
         saveAi();
       }));
       root.querySelector('[data-ai-test]').addEventListener('click', async e => {
@@ -319,7 +328,6 @@ export function accountView(app) {
         app.render();
       });
       root.querySelector('[data-restore]').addEventListener('click', () => pickBackupFile(app));
-      root.querySelector('[data-update]').addEventListener('click', () => checkForUpdates(app));
       root.querySelector('[data-switch]').addEventListener('click', () => app.switchAccount());
     },
   };

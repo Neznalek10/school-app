@@ -69,7 +69,11 @@ Two rules shape everything else:
 | Path | Responsibility |
 |---|---|
 | `sw.js` (dashboard and apps) | Offline cache. Never caches `/api/`. |
-| `js/locale.js` | Interface language, country and school of the signed-in account; date, number and week formats; `localizePrompt` keeps `[CZ]` or `[INTL]` lines of built-in prompts and `fillStudent` fills `{student}`. |
+| `js/locale.js` | Interface language, country and student profile of the signed-in account; `studentText` and `audienceText` describe the student in every prompt; date, number and week formats; `localizePrompt` keeps `[CZ]` or `[INTL]` lines of built-in prompts and `fillStudent` fills `{student}`. |
+| `js/student.js` | The student profile from Get started (age, year, stage, school, subjects, goals): `normalizeStudent`, `describeStudent` ("an 8-year-old student in year 2 of primary school in Germany") and `audienceLine`, the age-fitting style line added to prompts for students under 15. |
+| `js/curriculum.js`, `js/views/welcome.js` | Get started: the curriculum prompt, a tolerant parser for the AI's JSON, and `applyCurriculum`, which creates or updates subjects by name (never deletes) with profile, plan, topic outline and allowed apps. The view runs the one-question-per-screen interview and the build step. |
+| `js/testcheck.js`, `js/images.js`, `js/views/testcheck.js` | Photo test checker: photos are downscaled to JPEG in the browser (`prepareImage`), sent as image parts with `imageMessages`, and the AI's JSON is cleaned by `cleanResult`. Saved results (account key `checks`) hold text only. Also the recheck of one misread question and `addMistakeCards`, which fills the subject's "Mistakes from tests" lesson. |
+| `js/text.js` | `clip`: caps text by code point, so a cut never leaves half an emoji (a lone surrogate makes the server reject every later save). |
 | `js/i18n.js`, `js/i18n/cs.js` | Interface translation: views write English, and a MutationObserver swaps each text for the dictionary entry of the interface language. User content (`.md`, `.msg`, text boxes, `[data-no-tr]`) is never translated. |
 | `js/drafts.js` | Drafts of forms and text boxes in `school-draft.*` (not synced), restored with a Discard note and cleared on save. |
 | `js/holidays.js` | Calendar days by country: the built-in Czech calendar (`js/czech.js`) or public holidays from Nager.Date, cached per year in `school-cache.holidays.*` (not synced). |

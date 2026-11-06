@@ -1,0 +1,37 @@
+/*
+ * Styles of the Get started interview (js/views/welcome.js): step layout, progress dots, choice chips and the
+ * build step. Uses the design tokens defined in css/app.css.
+ */
+
+/* Layout: a single centred column, one question per screen, sized for a 360 px phone first. */
+.welcome { max-width: 520px; margin: 0 auto; padding: 8px 0 24px; }
+.welcome-title { margin: 18px 0 6px; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.welcome-hint { margin: 0 0 14px; font-size: 14px; }
+.welcome-step { min-height: 120px; }
+
+/* Progress dots: the current step is a wide pill, finished steps are filled. */
+.welcome-dots { display: flex; justify-content: center; gap: 8px; }
+.welcome-dots i { width: 8px; height: 8px; border-radius: 999px; background: var(--surface-3); }
+.welcome-dots i.done { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.welcome-dots i.now { width: 24px; background: var(--accent); }
+
+/* Choice chips: bigger than the default chip so they are easy to hit with a thumb. */
+.welcome-chip { height: 44px; padding: 0 16px; font-size: 15px; }
+.welcome-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.welcome-add-row { display: flex; gap: 8px; }
+.welcome-add-row .input { flex: 1; min-width: 0; }
+.welcome-text { font-family: var(--font); font-size: 16px; margin-top: 0; }
+
+/* Back and Next sit side by side; Next takes the remaining width. */
+.welcome-nav { display: flex; gap: 10px; margin: 22px 0 8px; }
+.welcome-next { flex: 1; }
+
+/* Build step: summary, paste box, preview blocks. */
+.welcome-summary { margin-bottom: 14px; padding: 14px 16px; border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm), 0 0 0 1px var(--border); }
+.welcome-summary p { margin: 4px 0 0; overflow-wrap: anywhere; }
+.welcome-copy .btn { margin-bottom: 4px; }
+.welcome-paste .textarea { margin-top: 0; }
+.welcome-preview { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; max-height: 420px; overflow-y: auto; }
+.welcome-block { margin: 0; padding: 12px; border-radius: 12px; background: var(--surface-2); font: inherit; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.welcome [data-apply] { margin-bottom: 6px; }
+.welcome [hidden] { display: none; }

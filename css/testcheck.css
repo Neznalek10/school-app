@@ -1,0 +1,68 @@
+/*
+ * Styles of the photo test checker (js/views/testcheck.js): mode choice, photo thumbnails, the result summary and
+ * the per-question cards, plus the "Topics this year" card on the subject's Lessons tab (js/views/subject.js).
+ * Uses the design tokens defined in css/app.css. Mobile first: everything stacks in one column at 360 px.
+ */
+
+/* Photo picker: two buttons side by side, then the thumbnail strip and per-file problems. */
+.tc-add { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.tc-add .btn { flex: 1 1 140px; }
+.tc-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+.tc-thumbs:empty { display: none; }
+.tc-thumb { position: relative; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 12px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--border); }
+.tc-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.tc-thumb-remove { position: absolute; top: 4px; right: 4px; width: 30px; height: 30px; background: var(--text); color: var(--bg); opacity: 0.85; }
+.tc-errors { margin: 10px 0 0; padding: 10px 12px 10px 28px; border-radius: 12px; background: var(--bad-soft); color: var(--bad-text); font-size: 14px; overflow-wrap: anywhere; }
+.tc-hint { margin: 10px 2px 0; }
+.tc-note { width: 100%; margin-top: 0; }
+
+/* Warning above the run button when photos would travel unencrypted. */
+.tc-unsafe { margin-bottom: 12px; }
+
+/* Status line under a button: progress while the AI reads, or the reason a step failed. */
+.tc-status { margin: 10px 2px 0; padding: 10px 12px; border-radius: 12px; background: var(--good-soft); color: var(--good-text); font-size: 14px; overflow-wrap: anywhere; }
+.tc-status.is-bad { background: var(--bad-soft); color: var(--bad-text); }
+.tc-status[hidden], .tc-errors[hidden] { display: none; }
+
+/* Result summary: verdict counts as pills, the score, the AI's summary and the topics to revise. */
+.tc-counts { display: flex; flex-wrap: wrap; gap: 6px; }
+.tc-count { padding: 4px 10px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); font-size: 13px; }
+.tc-count strong { color: var(--text); }
+.tc-count.v-correct { background: var(--good-soft); color: var(--good-text); }
+.tc-count.v-wrong { background: var(--bad-soft); color: var(--bad-text); }
+.tc-count.v-partial, .tc-count.v-blank { background: var(--warn-soft); color: var(--warn-text); }
+.tc-total { margin: 10px 0 0; font-size: 20px; font-weight: 650; }
+.tc-summary .tc-text { margin: 12px 0 0; }
+.tc-focus { margin: 4px 0 0; padding-left: 20px; color: var(--text-2); }
+.tc-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.tc-summary .tc-label { margin-top: 14px; }
+
+/* One card per question; the left edge colour shows the verdict. */
+.tc-card { margin-top: 12px; border-left: 4px solid var(--border-strong); }
+.tc-card.v-correct { border-left-color: var(--good); }
+.tc-card.v-wrong { border-left-color: var(--bad); }
+.tc-card.v-partial, .tc-card.v-blank { border-left-color: var(--warn); }
+.tc-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.tc-num { font-weight: 650; }
+.tc-verdict { padding: 2px 10px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); font-size: 12px; font-weight: 700; }
+.tc-verdict.v-correct { background: var(--good-soft); color: var(--good-text); }
+.tc-verdict.v-wrong { background: var(--bad-soft); color: var(--bad-text); }
+.tc-verdict.v-partial, .tc-verdict.v-blank { background: var(--warn-soft); color: var(--warn-text); }
+.tc-points { margin-left: auto; color: var(--text-3); font-size: 13px; font-variant-numeric: tabular-nums; }
+.tc-warn { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 8px; padding: 8px 10px; border-radius: 10px; background: var(--warn-soft); color: var(--warn-text); font-size: 14px; }
+.tc-warn .icon { flex: none; width: 18px; height: 18px; }
+.tc-field { margin-top: 10px; }
+.tc-label { color: var(--text-3); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.tc-text { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tc-correct .tc-text { color: var(--good-text); font-weight: 600; }
+.tc-try { margin-top: 12px; }
+.tc-try .muted { margin: 0; }
+.tc-input { width: 100%; margin-top: 6px; }
+.tc-fix { margin-top: 8px; padding-top: 4px; border-top: 1px solid var(--border); }
+.tc-fix-open { margin-top: 8px; }
+
+/* Topics this year (Lessons tab): a tick, the title and the detail on separate lines. */
+.topic-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); }
+.topic-row:first-child { border-top: 0; }
+.topic-row.is-done .topic-main strong { color: var(--text-3); text-decoration: line-through; }
+.topic-main strong, .topic-main small { overflow: visible; white-space: normal; overflow-wrap: anywhere; }

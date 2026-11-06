@@ -4,6 +4,43 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 The 1.x history lived in the earlier project (school-learning-app). This file starts at 2.0.0.
 
+## [2.5.0] - 2026-11-06
+
+### Added
+
+- Get started: a new account answers a few questions, one per screen (languages, country, age, school year and stage, school, this year's subjects, goals). An AI, in the app or by copy and paste, then plans the school year: each subject gets a profile, a study plan, a topic outline and a matching practice app where one fits. "Skip for now" keeps the answers; older accounts see a "Tell the app about you" card on Home, and Account › About you reopens the interview.
+- Topics this year: the topic outline at the top of a subject's Lessons tab, with a tick per topic.
+- Photo test checker: photograph a marked or blank test (up to 8 photos) from the subject's Practice tab or the test's page. Each question shows its verdict, the correct answer, an explanation and a tip; unclear reads are flagged. Results are saved with the subject and the test, photos never are.
+- Try first: wrong and blank answers stay hidden until you try again or tap Show answer.
+- Fix a misread: correct what the AI read for one question and recheck only that question.
+- Mistakes to flashcards: one tap puts the missed questions into the subject's "Mistakes from tests" lesson.
+- Photo model setting in Account › AI assistants, and a warning when photos would go to a plain http address on another computer.
+
+### Changed
+
+- The student profile reaches every AI prompt (assistants, copy-paste prompts, setup interview, lesson prompts, test checks), with simpler wording for students under 15 and very short sentences for the youngest.
+- Prompts no longer assume a first-year Czech gymnázium student or a secondary school student. Czech lesson prompts pitch at the student's own level.
+- New accounts start with no subjects. The French course and the English vocabulary trainer are now the French and English starter kits, and the AI can add them in Get started.
+- The welcome screen, the setup interview's stop word ("done", or the same word in your language), the grade placeholder ("A, 2, 85 %"), the lesson topic examples and the template wording are no longer Czech-specific.
+- Názvosloví and Číselné soustavy from an AI setup are only accepted for Czech accounts.
+- The AI key help says OpenRouter accounts are for adults, so younger students ask a parent.
+- Account's "Your school and year" text moved into the profile's school field.
+
+### Fixed
+
+- A cut that split an emoji could stop every later save to the data file.
+- A setup that failed half-way could leave a subject half-changed.
+- A setup reply with an example JSON block before the real one could not be applied.
+- AI errors that sent an object as the message, an error code inside a normal reply, or a cut-off answer now say what happened.
+- A chat reply that arrived after "New chat" landed in the new chat.
+- Re-running a subject setup left the chats of the replaced assistants behind.
+- An unknown country code counted as a real country.
+- Restored backups are checked more strictly: malformed test results and topic lists are cleaned or dropped.
+
+### Removed
+
+- The "Check for updates" button in Account: updates install themselves.
+
 ## [2.4.0] - 2026-11-06
 
 ### Added

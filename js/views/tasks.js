@@ -5,6 +5,7 @@ import { html, raw, icon, plural, emptyState } from '../ui.js';
 import { eventSheet } from './calendar.js';
 import { sourceSheet, sourcesOf, hostOf, openFile, SOURCE_KINDS } from './sources.js';
 import { timeAgo } from './parts.js';
+import { checkHref, checkList } from './testcheck.js';
 
 export const taskHref = ev => `#/task/${encodeURIComponent(ev.id)}`;
 const STATUSES = [{ key: 'todo', label: 'To do' }, { key: 'done', label: 'Done' }, { key: 'all', label: 'All' }];
@@ -216,6 +217,7 @@ export function taskView(app, { id, edit }) {
   const self = `task/${encodeURIComponent(ev.id)}`;
   const chat = assistant => `#/chat/${encodeURIComponent(subject.id)}/${assistant}?event=${encodeURIComponent(ev.id)}`;
   const isTest = ev.type === 'test';
+  const checks = app.checksOf(subject.id).filter(c => c.eventId === ev.id);
 
   const body = html`
     <section class="card task-head">
@@ -229,7 +231,7 @@ export function taskView(app, { id, edit }) {
         <button class="btn ${ev.done ? 'btn-secondary' : 'btn-primary'}" data-done>${icon('check')}${ev.done ? 'Done · undo' : isTest ? 'Mark as written' : 'Mark as done'}</button>
         <button class="btn btn-secondary" data-edit>${icon('edit')}Edit</button>
       </div>
-      ${isTest ? html`<label class="task-grade"><span>Grade</span><input class="input" name="grade" maxlength="12" value="${ev.grade || ''}" placeholder="e.g. 1, 2-, 85 %" autocomplete="off"></label>` : ''}
+      ${isTest ? html`<label class="task-grade"><span>Grade</span><input class="input" name="grade" maxlength="12" value="${ev.grade || ''}" placeholder="e.g. A, 2, 85 %" autocomplete="off"></label>` : ''}
     </section>
 
     <section class="card">
@@ -260,7 +262,14 @@ export function taskView(app, { id, edit }) {
           : [['tutor', 'learn', 'Help me with this homework'], ['check', 'check', 'Check my answer']]).map(([a, i, label]) => html`<div class="assistant-row">
           <a class="assistant-main" href="${chat(a)}"><span class="assistant-icon">${icon(i)}</span><span class="note-row-main"><strong>${label}</strong></span></a>${icon('chevronRight', 'chevron')}</div>`)}
       </div>
-    </section>`;
+    </section>
+
+    ${isTest ? html`<section class="card">
+      <header class="card-head"><h2>Marked test</h2>${checks.length ? html`<span class="card-meta">${plural(checks.length, 'result')}</span>` : ''}</header>
+      <p class="muted small">Photograph the marked test: the AI gives the correct answers and explains each miss.</p>
+      ${checks.length ? checkList(checks) : ''}
+      <a class="btn btn-secondary btn-block" href="${checkHref(subject.id, { event: ev.id })}">${icon('clipboard')}Check my marked test</a>
+    </section>` : ''}`;
 
   let timer;
   let root;
