@@ -23,6 +23,7 @@ import { sourcesPanel, mountSources, sourcesOf } from './sources.js';
 import { taskHref } from './tasks.js';
 import { lessonsPanel, mountLessons, lessonsOf, lessonStats, lessonHref } from './lessons.js';
 import { startStudy } from './study.js';
+import { checkHref, checkList } from './testcheck.js';
 import { chemPracticeCard } from './chem.js';
 import { exerciseStats, startExercises } from './exercises.js';
 import { bindDraft } from '../drafts.js';
@@ -125,8 +126,9 @@ export function subjectSheet(app, subject = null) {
         for (const s of sourcesOf(subject.id)) if (s.fileId) deleteFile(s.fileId);
         store.sources = store.sources.filter(s => s.subjectId !== subject.id);
         store.lessons = store.lessons.filter(l => l.subjectId !== subject.id);
+        store.checks = store.checks.filter(c => c.subjectId !== subject.id);
         for (const key of Object.keys(store.chats)) if (key.startsWith(`${subject.id}/`)) delete store.chats[key];
-        ['subjects', 'notes', 'events', 'sources', 'lessons', 'chats'].forEach(k => store.save(k));
+        ['subjects', 'notes', 'events', 'sources', 'lessons', 'checks', 'chats'].forEach(k => store.save(k));
         app.refreshSide();
         app.toast(`Deleted ${subject.name}.`, { kind: 'success' });
         app.go('home');
@@ -290,14 +292,71 @@ function exercisesSection(subject) {
     ${lessons.length > 1 ? html`<button class="btn btn-primary btn-block" data-ex-all>${icon('play')}Mix exercises from all lessons</button>` : ''}`;
 }
 
+/**
+ * The subject's topics, tolerating a missing or damaged `topics` value.
+ *
+ * @param {object} subject The subject.
+ * @returns {object[]} The topics array, or an empty one.
+ */
+const topicsOf = subject => (Array.isArray(subject.topics) ? subject.topics : []);
+
+/**
+ * The inside of the "Topics this year" card: heading with the progress, then one row per topic with a tick.
+ *
+ * @param {object} subject The subject; its `topics` are [{ id, title, detail, done }].
+ * @returns {object} html`` fragment.
+ */
+function topicsContent(subject) {
+  const topics = topicsOf(subject);
+  const done = topics.filter(t => t.done).length;
+  return html`<header class="card-head"><h2>Topics this year</h2><span class="card-meta">${done} of ${topics.length} done</span></header>
+    ${topics.map(t => html`<div class="topic-row ${t.done ? 'is-done' : ''}">
+      <button type="button" class="tick ${t.done ? 'on' : ''}" data-topic="${t.id}" aria-pressed="${String(!!t.done)}" aria-label="${t.done ? 'Mark as not done' : 'Mark as done'}">${icon('check')}</button>
+      <span class="note-row-main topic-main"><strong data-no-tr>${t.title}</strong>${t.detail ? html`<small data-no-tr>${t.detail}</small>` : ''}</span>
+    </div>`)}`;
+}
+
+/**
+ * The "Topics this year" card of the Lessons tab.
+ *
+ * @param {object} subject The subject.
+ * @returns {object|string} html`` fragment, or '' when the subject has no topics.
+ */
+function topicsCard(subject) {
+  return topicsOf(subject).length ? html`<section class="card topics-card">${topicsContent(subject)}</section>` : '';
+}
+
+/**
+ * Makes the ticks of the topics card work: a tap flips `done`, saves the subjects and redraws the card in place.
+ *
+ * @param {HTMLElement} root The page container.
+ * @param {object} subject The subject whose topics are shown; mutated on a tap.
+ */
+function mountTopics(root, subject) {
+  const card = root.querySelector('.topics-card');
+  if (!card) return;
+  card.addEventListener('click', e => {
+    const btn = e.target.closest('[data-topic]');
+    const topic = btn && topicsOf(subject).find(t => t.id === btn.dataset.topic);
+    if (!topic) return;
+    topic.done = !topic.done;
+    store.save('subjects');
+    card.innerHTML = topicsContent(subject).s;
+    // Matched by comparison, not by selector, because a topic id may hold characters a selector would misread.
+    [...card.querySelectorAll('[data-topic]')].find(b => b.dataset.topic === topic.id)?.focus();
+  });
+}
+
 function practicePanel(app, subject) {
   const chatHref = id => `#/chat/${encodeURIComponent(subject.id)}/${id}`;
   const test = upcoming(eventsOf(subject.id).filter(e => e.type === 'test' && isOpen(e)), { days: 30, limit: 1 })[0];
   const notes = app.notesOf(subject.id).length;
+  const checks = app.checksOf(subject.id);
   const ai = [
-    { id: 'quiz', icon: 'target', name: 'Quiz me', sub: notes ? `Questions from your ${plural(notes, 'note')}` : 'Questions on any topic you name' },
-    { id: 'check', icon: 'check', name: 'Check my work', sub: 'Paste an answer or solution and get it marked' },
-    { id: 'sheet', icon: 'notes', name: 'Study sheet', sub: 'Your notes as a sheet to revise from' },
+    { href: checkHref(subject.id), icon: 'clipboard', name: 'Check a test from a photo', sub: 'Photograph a test to get the correct answers and see what to fix' },
+    { href: chatHref('quiz'), icon: 'target', name: 'Quiz me', sub: notes ? `Questions from your ${plural(notes, 'note')}` : 'Questions on any topic you name' },
+    { href: chatHref('check'), icon: 'check', name: 'Check my work', sub: 'Paste an answer or solution and get it marked' },
+    { href: chatHref('sheet'), icon: 'notes', name: 'Study sheet', sub: 'Your notes as a sheet to revise from' },
   ];
   return html`
     ${test ? html`<a class="notice notice-test" href="${chatHref('quiz')}?event=${encodeURIComponent(test.id)}">${icon('target')}<span><strong>${test.title}</strong> is ${whenLabel(test.date).toLowerCase()}. Practise for it with a quiz on its study materials.</span>${icon('chevronRight')}</a>` : ''}
@@ -307,9 +366,11 @@ function practicePanel(app, subject) {
     ${flashcardsSection(app, subject)}
     <h3 class="group-title">Practise with AI</h3>
     <div class="card assistant-list">${ai.map(a => html`<div class="assistant-row">
-      <a class="assistant-main" href="${chatHref(a.id)}"><span class="assistant-icon">${icon(a.icon)}</span>
+      <a class="assistant-main" href="${a.href}"><span class="assistant-icon">${icon(a.icon)}</span>
         <span class="note-row-main"><strong>${a.name}</strong><small>${a.sub}</small></span></a>${icon('chevronRight', 'chevron')}
-    </div>`)}</div>`;
+    </div>`)}</div>
+    ${checks.length ? html`<h3 class="group-title">Checked tests<span>${plural(checks.length, 'result')}</span></h3>
+      <div class="card">${checkList(checks)}</div>` : ''}`;
 }
 
 const TABS = [
@@ -332,7 +393,7 @@ export function subjectView(app, params) {
   const counts = [plural(lessonsOf(subject.id).length, 'lesson'), plural(app.notesOf(subject.id).length, 'note'), plural(sourcesOf(subject.id).length, 'source'), plural(upcoming(eventsOf(subject.id)).length, 'event') + ' ahead'];
   const panels = {
     calendar: () => calendarPanel(app, subject, params),
-    lessons: () => lessonsPanel(app, subject),
+    lessons: () => html`${topicsCard(subject)}${lessonsPanel(app, subject)}`,
     notes: () => notesPanel(app, subject),
     sources: () => sourcesPanel(subject),
     practice: () => practicePanel(app, subject),
@@ -365,7 +426,10 @@ export function subjectView(app, params) {
       });
       if (active === 'calendar') return mountCalendar(app, subject, root, params);
       if (active === 'sources') return mountSources(app, subject, root);
-      if (active === 'lessons') return mountLessons(app, subject, root);
+      if (active === 'lessons') {
+        mountTopics(root, subject);
+        return mountLessons(app, subject, root);
+      }
       root.querySelectorAll('[data-study-lesson]').forEach(btn => btn.addEventListener('click', () => {
         const lesson = app.lesson(btn.dataset.studyLesson);
         startStudy(app, { lessons: [lesson], title: lesson.title });

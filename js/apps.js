@@ -21,7 +21,15 @@ export const APPS = {
   },
 };
 
-export function appUrl(key, account, back = '#/subject/languages') {
+/**
+ * Builds the address that opens a built-in app for an account.
+ *
+ * @param {string} key App key from APPS.
+ * @param {{ id: string, name: string }} account The signed-in account.
+ * @param {string} [back] Hash the app's Home link returns to: the dashboard by default, or the subject page that holds the app.
+ * @returns {string} Relative URL of the app with the profile and return link in its query.
+ */
+export function appUrl(key, account, back = '#/home') {
   const app = APPS[key];
   const home = new URL(`./index.html${back}`, location.href).href;
   const params = new URLSearchParams({ profile: account.id, name: account.name, ...app.params, home });

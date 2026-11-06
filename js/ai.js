@@ -1,20 +1,53 @@
 /**
  * AI client and prompt builders.
  *
- * Responsibility: one OpenAI-compatible chat call (chat), and the prompts every assistant uses: the in-app
- * system prompt and the copy-paste prompt, both with the subject profile, upcoming tests and notes.
- * Used by views/chat.js, views/prompts.js and views/subject.js; uses store.js for settings.
+ * Responsibility: one OpenAI-compatible chat call (chat), the photo helpers (visionSettings, imageMessages),
+ * and the prompts every assistant uses: the in-app system prompt and the copy-paste prompt, both with the
+ * subject profile, the student's age-fitting style line, upcoming tests and notes.
+ * Used by views/chat.js, views/prompts.js, views/subject.js and the test checker; uses store.js for settings
+ * and locale.js for the student text.
  * Invariants: the AI key is only sent over https or to localhost, and `sk-...` text is masked in errors.
  */
 import { store, DEFAULT_AI } from './store.js';
 import { typeOf, firstLine } from './events.js';
 import { profileLine } from './study.js';
-import { fillStudent, studentText } from './locale.js';
+import { fillStudent, studentText, audienceText } from './locale.js';
+import { clip } from './text.js';
 
 export { DEFAULT_AI, profileLine };
 export const aiSettings = () => ({ ...DEFAULT_AI, ...store.settings.ai });
 
+/**
+ * The AI settings for a request that carries photos: the same connection with the photo model when one is set.
+ *
+ * @returns {object} aiSettings() with `model` replaced by the trimmed `visionModel`, or kept when that is empty.
+ */
+export function visionSettings() {
+  const ai = aiSettings();
+  const visionModel = typeof ai.visionModel === 'string' ? ai.visionModel.trim() : '';
+  return { ...ai, model: visionModel || ai.model };
+}
+
+/**
+ * Builds the messages of one request that sends photos along with the text.
+ *
+ * @param {string} text The prompt.
+ * @param {string[]} dataUrls Photos as `data:image/jpeg;base64,...` URLs (see js/images.js).
+ * @returns {object[]} One user message whose content is the text part followed by one `image_url` part per photo
+ *   (the OpenAI format that OpenRouter, Ollama and LM Studio accept).
+ * @example
+ * await chat(visionSettings(), imageMessages(prompt, photos), { timeout: PHOTO_TIMEOUT_MS });
+ */
+export const imageMessages = (text, dataUrls) => [{
+  role: 'user',
+  content: [{ type: 'text', text }, ...dataUrls.map(url => ({ type: 'image_url', image_url: { url } }))],
+}];
+
 const TIMEOUT_MS = 90000;
+/** Reading photos takes a model longer than answering text, so photo requests get more time. */
+export const PHOTO_TIMEOUT_MS = 150000;
+/** Shown with an AI error on a photo request: the likely cause is a model that cannot read images. */
+export const PHOTO_MODEL_HINT = 'The model may not read photos. Pick a model that does in Account › AI assistants › Photo model.';
 // Long enough for a term of notes, short enough for free models with small context windows.
 export const NOTES_BUDGET = 16000;
 
@@ -34,6 +67,10 @@ const KEY_LIKE = /\bsk-[\w-]+/g;
 const MIN_SECRET_LENGTH = 6;
 /** Longest excerpt of a provider's error body shown to the student. */
 const DETAIL_MAX_CHARS = 140;
+/** Error codes a provider may put in the body of a 200 answer, handled like the same HTTP status. */
+const BODY_ERROR_STATUSES = [401, 402, 403, 429];
+/** Shown when the model stopped at its length limit before writing any answer text. */
+const OUT_OF_ROOM_MESSAGE = 'The AI ran out of room before finishing. Try again, or pick a model with a larger limit in Account.';
 
 /**
  * Hides keys in text that will be shown to the student.
@@ -122,8 +159,27 @@ export async function chat(ai, messages, { timeout = TIMEOUT_MS, temperature = 0
     clearTimeout(timer);
   }
   const text = contentText(data?.choices?.[0]?.message?.content).trim();
-  if (!text) throw new AiError('format', maskKeys(data?.error?.message || 'The AI sent back an empty answer.', ai.key));
+  if (!text) throw emptyAnswerError(data, ai.key);
   return text;
+}
+
+/**
+ * Explains an answer that came back without text: a provider error in the body, a cut-off answer or plain emptiness.
+ *
+ * @param {object|null} data The parsed response.
+ * @param {string} secret The configured AI key, masked in the message.
+ * @returns {AiError} Kind auth or limit for a known error code, otherwise format.
+ */
+function emptyAnswerError(data, secret) {
+  const failure = data?.error;
+  // Providers such as OpenRouter report a refused key or an empty balance inside a 200 answer; treat it like the HTTP status.
+  const status = Number(failure?.code);
+  if (BODY_ERROR_STATUSES.includes(status)) return httpError(status, '', secret);
+  // `error.message` is only shown when it is text: an object there would print as "[object Object]".
+  const message = typeof failure?.message === 'string' ? failure.message.trim() : '';
+  if (message) return new AiError('format', maskKeys(message, secret));
+  if (data?.choices?.[0]?.finish_reason === 'length') return new AiError('format', OUT_OF_ROOM_MESSAGE);
+  return new AiError('format', 'The AI sent back an empty answer.');
 }
 
 /**
@@ -135,12 +191,13 @@ export async function chat(ai, messages, { timeout = TIMEOUT_MS, temperature = 0
  * @returns {AiError} Kind auth, limit or http.
  */
 export function httpError(status, body = '', secret = '') {
-  if (status === 401 || status === 403) return new AiError('auth', 'The AI refused the key. Check it in Account.');
+  if (status === 401) return new AiError('auth', 'The AI refused the key. Check it in Account.');
+  if (status === 403) return new AiError('auth', 'The AI refused the request. Check the key in Account, or try another model.');
   if (status === 402) return new AiError('limit', 'This model needs credit on your OpenRouter account. Pick a free model in Account.');
   if (status === 404) return new AiError('http', 'The AI could not find this model. Check the model name in Account.');
   if (status === 429) return new AiError('limit', 'The AI is busy or your free requests for today are used up. Try again in a minute, or change the model in Account.');
   // Mask first, then cut, so a key cut in half by the limit can't slip through.
-  const detail = maskKeys(String(body).replace(/\s+/g, ' '), secret).slice(0, DETAIL_MAX_CHARS);
+  const detail = clip(maskKeys(String(body).replace(/\s+/g, ' '), secret), DETAIL_MAX_CHARS);
   return new AiError('http', `The AI answered with an error (${status}).${detail ? ` ${detail}` : ''}`);
 }
 
@@ -173,7 +230,8 @@ export function notesContext(notes, budget = NOTES_BUDGET) {
     const block = `### ${n.title || 'Untitled'}\n${n.body || ''}`.trim();
     if (used + block.length > budget) {
       const room = budget - used;
-      if (room > 400) parts.push(`${block.slice(0, room)}\n[cut]`);
+      // Cut by code point: a half emoji would be an invalid character in the request.
+      if (room > 400) parts.push(`${clip(block, room)}\n[cut]`);
       break;
     }
     parts.push(block);
@@ -217,7 +275,7 @@ export function notesBlock(subject, notes, budget, { external = false } = {}) {
 const fillSubject = (assistant, subject) => fillStudent(assistant.prompt.replaceAll('{subject}', () => subject.name));
 
 /**
- * System message for the in-app chat: role, subject profile, language, tests and notes.
+ * System message for the in-app chat: role, subject profile, style line for young students, language, tests and notes.
  *
  * @param {{ assistant: object, subject: object, notes?: object[], events?: object[], language?: string }} input
  * @returns {string} The system prompt.
@@ -226,6 +284,7 @@ export function systemPrompt({ assistant, subject, notes, events = [], language 
   return [
     fillSubject(assistant, subject),
     profileLine(subject),
+    audienceText(),
     `Always answer in ${languageName(language)}, unless the student writes in another language and asks you to switch. Use Markdown: short paragraphs, bullet lists and **bold** key terms.`,
     upcomingLines(subject, events),
     notesBlock(subject, notes, NOTES_BUDGET),
@@ -236,7 +295,7 @@ export function systemPrompt({ assistant, subject, notes, events = [], language 
 export const EXTERNAL_NOTES_BUDGET = 60000;
 
 /**
- * The same assistant as one message to paste into an outside AI: role, profile, language, tests, notes, and how to start.
+ * The same assistant as one message to paste into an outside AI: role, profile, style line for young students, language, tests, notes, and how to start.
  *
  * @param {{ assistant: object, subject: object, notes?: object[], events?: object[], language?: string }} input
  * @returns {string} The prompt to paste.
@@ -249,6 +308,7 @@ export function externalPrompt({ assistant, subject, notes = [], events = [], la
     `I am ${studentText()}. This message sets up our chat about ${subject.name}. Your role:`,
     fillSubject(assistant, subject),
     profileLine(subject),
+    audienceText(),
     `Always answer in ${languageName(language)}, unless I ask you to switch. Use short paragraphs, bullet lists and **bold** key terms.`,
     upcomingLines(subject, events),
     notesBlock(subject, notes, EXTERNAL_NOTES_BUDGET, { external: true }),

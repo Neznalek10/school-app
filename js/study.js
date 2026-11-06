@@ -2,12 +2,15 @@
  * Learning-plan templates, lesson prompts and lesson JSON parsing.
  *
  * Responsibility: the prompt templates (TEMPLATES), promptFor (template + subject profile + plan extras),
- * and parsing/repairing the AI's lesson JSON. Pure logic: no storage or network. Used by lesson views,
- * setup.js and ai.js (which re-exports profileLine).
+ * and parsing/repairing the AI's lesson JSON (extractJson finds the JSON object in a chat answer). Pure logic:
+ * no storage or network. Used by lesson views, setup.js, curriculum.js, testcheck.js and ai.js (which
+ * re-exports profileLine). Czech school conventions in the prompts live only in [CZ] lines
+ * (see localizePrompt); every other line is written for any student, who is described by {student}.
  */
 import { normalize, check } from './check.js';
 import { shuffle } from './srs.js';
-import { localizePrompt, fillStudent } from './locale.js';
+import { localizePrompt, fillStudent, audienceText } from './locale.js';
+import { clip } from './text.js';
 
 // A learning plan is the prompt a subject uses to turn a presentation into a lesson: notes, visuals, timeline, answers and flashcards.
 // Every template asks for the same JSON shape, so one parser and one lesson page serve all subjects.
@@ -186,7 +189,7 @@ Rules:
       empty: 'Photograph the textbook pages, give them to ChatGPT or Gemini with the prompt, and paste the answer back. You get the literary movement, then its poets, philosophers, prose writers and dramatists with their lives, works, plots and how to tell the works apart, plus flashcards.',
     },
     hint: 'Photos of book pages: the literary movement, then poets, philosophers, prose writers and dramatists, each with life, works, plot and how to recognise them, plus flashcards',
-    prompt: `I am {student}, studying {subject} literature. I am giving you photos of pages from my textbook about a literary movement or period, for example Romanticism. Read every page, including captions, boxes, excerpts and pictures. The pages decide which movement, authors and works the lesson covers. Then research every author and work from reliable knowledge so the notes are complete enough for the school-leaving exam.
+    prompt: `I am {student}, studying {subject} literature. I am giving you photos of pages from my textbook about a literary movement or period, for example Romanticism. Read every page, including captions, boxes, excerpts and pictures. The pages decide which movement, authors and works the lesson covers. Then research every author and work from reliable knowledge so the notes are complete enough for a test or exam at my level.
 
 Reply with ONE JSON object inside a single \`\`\`json code block and nothing else, in exactly this shape:
 
@@ -196,23 +199,32 @@ Rules:
 - overview: 3 to 5 sentences on the movement: when and where, what it reacted against, and its main ideals.
 - notes: Markdown in exactly this structure, repeated for each movement on the pages:
   # name of the movement
-  ## Charakteristika směru
+  [CZ]## Charakteristika směru
+  [INTL]## Characteristics of the movement
   Bullet points: time and countries, historical and philosophical background, ideals, main features, genres and their hierarchy, rules of form and style, and how it differs from the movement before it and after it.
-  ## Básníci
-  ## Filozofové
-  ## Prozaici
-  ## Dramatici
+  [CZ]## Básníci
+  [INTL]## Poets
+  [CZ]## Filozofové
+  [INTL]## Philosophers
+  [CZ]## Prozaici
+  [INTL]## Prose writers
+  [CZ]## Dramatici
+  [INTL]## Dramatists
   Under each group, one heading per author: ### Name (birth–death), country. Then:
-  - **Život:** 3 to 6 bullet points: origin, education, career, key events, and how the life shows in the work.
-  - **Díla:** every work the pages mention, plus the author's most important works if they are missing.
+  [CZ]- **Život:** 3 to 6 bullet points: origin, education, career, key events, and how the life shows in the work.
+  [INTL]- **Life:** 3 to 6 bullet points: origin, education, career, key events, and how the life shows in the work.
+  [CZ]- **Díla:** every work the pages mention, plus the author's most important works if they are missing.
+  [INTL]- **Works:** every work the pages mention, plus the author's most important works if they are missing.
   Then one heading per main work: #### Title (year), genre. Under it:
-  - **O čem je:** theme and main idea. If the pages tell the story or the work is one of the author's main works, give the plot in 4 to 8 sentences with the main characters by name.
-  - **Jak ho poznat:** 2 to 4 features that tell this work apart from the other works of the same movement: form (verse or prose, number of acts, metre), setting, characters, theme, tone, a famous line or the opening.
+  [CZ]- **O čem je:** theme and main idea. If the pages tell the story or the work is one of the author's main works, give the plot in 4 to 8 sentences with the main characters by name.
+  [INTL]- **What it is about:** theme and main idea. If the pages tell the story or the work is one of the author's main works, give the plot in 4 to 8 sentences with the main characters by name.
+  [CZ]- **Jak ho poznat:** 2 to 4 features that tell this work apart from the other works of the same movement: form (verse or prose, number of acts, metre), setting, characters, theme, tone, a famous line or the opening.
+  [INTL]- **How to recognise it:** 2 to 4 features that tell this work apart from the other works of the same movement: form (verse or prose, number of acts, metre), setting, characters, theme, tone, a famous line or the opening.
   Put each author in one group only, the group of their main work, and mention their other kinds of writing there. Leave out a group with no authors. Order authors as the pages do, otherwise by year of birth.
 - You may add a few important representatives the pages leave out. Mark every author and work that is not on the pages with "(not in the book)", written in the language of the book.
 - visuals: portraits, illustrations, title pages and other pictures on the pages, in page order. kind is painting for portraits and illustrations, photo for photographs, building, or other.
 - timeline: the start and end of the movement, the historical events the pages connect to it, and the first publication or premiere of every work in the notes, oldest first. Write events as "Author: Title". year is a number for sorting (the first year of a range). date is how the date is written. Births and deaths stay in the notes.
-- terms: every literary term and genre (for example óda, bajka, tragédie, trojí jednota), with a one-sentence definition.
+- terms: every literary term and genre (for example ode, fable, tragedy, the three unities), with a one-sentence definition.
 - answers: every question or task on the pages, for example under an excerpt, answered fully. If the pages do not answer it, use reliable knowledge and add "(not in the book)". Use [] if there are none.
 - cards: 30 to 60 flashcards covering every author and main work. Include:
   - qa: who wrote each main work, and its genre.
@@ -235,7 +247,7 @@ Rules:
       attach: 'Turn on web search if the AI has it, so it researches your topics. You can also attach your own materials.',
       blurb: 'The AI first asks for your key topics. To put them into the prompt yourself, use Lessons › New lesson. Paste the answer there to get notes and flashcards.',
       empty: 'Write the key topics, copy the prompt into ChatGPT or Gemini, and paste the answer back. The AI researches the topics and you get notes, key terms, typical test questions and flashcards.',
-      topicsExample: 'Buňka: stavba a typy\nFotosyntéza\nBuněčné dýchání',
+      topicsExample: 'The cell: structure and types\nPhotosynthesis\nCellular respiration',
     },
     hint: 'You write the key topics, the AI researches them: notes at your school level, key terms, typical test questions and flashcards',
     prompt: `I am {student}, studying {subject}. Research the key topics I give you and write study notes I can learn from for tests. Search the web and use reliable sources: encyclopedias, textbooks, and university, museum or government sites. If you cannot search, use reliable knowledge and say so in the overview. If I attach my own materials, use them too.
@@ -247,8 +259,7 @@ Reply with ONE JSON object inside a single \`\`\`json code block and nothing els
 ${SHAPE}
 
 Rules:
-- [CZ]Pitch everything at the first year of a Czech gymnázium (the RVP G curriculum): what a test there expects, not university level.
-- [INTL]Pitch everything at the level of {student}: what a test there expects, not university level.
+- Pitch everything at the level of {student}: what a test there expects, not university level.
 - overview: 3 to 5 sentences on what the topics cover and how they fit together.
 - notes: one ## heading per key topic, in my order, with ### subheadings where useful. Explain each topic clearly and correctly: the key facts, numbers and examples (examples from my country where they fit), processes step by step, and the differences between things that are easy to confuse. Use short bullet points and **bold** key terms. End with a ## section listing the sources you used, with their title and web address.
 - visuals: diagrams, maps or pictures that are essential for these topics (for example the structure of a cell or a climate map), so I can look them up and recognise them. description says what it shows and what to notice. kind is one of photo, painting, statue, building, map, diagram, chart, other. Use [] if none are essential.
@@ -271,22 +282,22 @@ Rules:
       attach: 'You can also attach a worksheet, textbook pages or a presentation: the AI solves its tasks first.',
       blurb: 'The AI first asks for your key topics or a worksheet. To put the topics into the prompt yourself, use Lessons › New lesson. Paste the answer there to get notes, exercises and flashcards.',
       empty: 'Write the topics (or attach a worksheet), copy the prompt into ChatGPT or Gemini, and paste the answer back. You get notes with solved examples and 12 to 18 exercises from easy to hard, each with a hint and a step-by-step solution.',
-      topicsExample: 'Lineární rovnice\nRovnice s neznámou ve jmenovateli\nSlovní úlohy o společné práci',
+      topicsExample: 'Linear equations\nEquations with fractions\nWord problems about shared work',
     },
     hint: 'Notes with solved examples, then exercises from easy to hard: you type the result, the hint and the step-by-step solution open when you ask',
     prompt: `${PROBLEMS_START}
-- [CZ]Pitch everything at the first year of a Czech gymnázium (RVP G) and use Czech school conventions: decimal comma, K = {…} for solution sets, intervals like (2; 5⟩, and the check of an equation (zkouška).
+- [CZ]Pitch everything at the level of {student} and use Czech school conventions: decimal comma, K = {…} for solution sets, intervals like (2; 5⟩, and the check of an equation (zkouška).
 - [INTL]Pitch everything at the level of {student} and use the maths conventions taught there: the usual decimal separator, notation for solution sets and intervals, and a check of every equation's solution.
 - Write maths in plain text with Unicode, never LaTeX: x², x³, √(x + 1), (a + b)/(2c), ·, :, ≤, ≥, ≠, ±, ∞, π, ∈, ∉, ∪, ∩, ∅, ℝ, ℕ. Never use $ signs or backslashes.
 - overview: 3 to 5 sentences on what the topics are and how they connect.
-- notes: one ## heading per topic, in my order. For each: definitions and rules in short bullets, every formula on its own line with what each letter means, the typical mistakes to avoid, and one or two fully solved examples under ### Vzorový příklad, written step by step like the solutions.
+- notes: one ## heading per topic, in my order. For each: definitions and rules in short bullets, every formula on its own line with what each letter means, the typical mistakes to avoid, and one or two fully solved examples under a ### Solved example heading, written step by step like the solutions.
 - visuals: graphs or diagrams that are essential (for example the graph of a function), described so I can sketch them; otherwise [].
 - exercises: 12 to 18 exercises that cover every topic, ordered from easy to hard:
   - level 1 (about a third): one rule or formula, nice numbers, a few lines of work.
   - level 2 (about a third): two or three steps, or combining two rules.
-  - level 3 (the rest): word problems (slovní úlohy), tasks that combine topics, or explain-why tasks.
+  - level 3 (the rest): word problems, tasks that combine topics, or explain-why tasks.
   Vary the kind of task: computing, simplifying, solving equations, word problems, and a few where I find the mistake in a given solution or decide whether a statement is true and why.
-- In the solutions of equations, end with the check (zkouška). In word problems start with what is given and what we look for, and finish with an answer sentence (Odpověď: …).
+- In the solutions of equations, end with the check. In word problems start with what is given and what we look for, and finish with an answer sentence.
 ${EXERCISE_FIELDS}`,
   },
   physics: {
@@ -299,15 +310,15 @@ ${EXERCISE_FIELDS}`,
       attach: 'You can also attach a worksheet, textbook pages or a presentation: the AI solves its tasks first.',
       blurb: 'The AI first asks for your key topics or a worksheet. To put the topics into the prompt yourself, use Lessons › New lesson. Paste the answer there to get notes, exercises and flashcards.',
       empty: 'Write the topics (or attach a worksheet), copy the prompt into ChatGPT or Gemini, and paste the answer back. You get notes with laws, units and solved examples, and 12 to 18 exercises from easy to hard, each with a hint and a step-by-step solution.',
-      topicsExample: 'Rovnoměrný přímočarý pohyb\nRovnoměrně zrychlený pohyb\nVolný pád',
+      topicsExample: 'Uniform motion\nUniformly accelerated motion\nFree fall',
     },
-    hint: 'Notes with laws, units and solved examples, then exercises from easy to hard with zápis, units and a step-by-step solution that opens when you ask',
+    hint: 'Notes with laws, units and solved examples, then exercises from easy to hard with the given values, units and a step-by-step solution that opens when you ask',
     prompt: `${PROBLEMS_START}
-- [CZ]Pitch everything at the first year of a Czech gymnázium (RVP G) and use Czech school conventions: decimal comma, quantities with their symbols and SI units, and g = 10 m/s² unless the task says to use 9,81 m/s² (always say in the task which value to use).
+- [CZ]Pitch everything at the level of {student} and use Czech school conventions: decimal comma, quantities with their symbols and SI units, and g = 10 m/s² unless the task says to use 9,81 m/s² (always say in the task which value to use).
 - [INTL]Pitch everything at the level of {student}, with the usual decimal separator, quantities with their symbols and SI units, and say in each task which value of g to use.
 - Write formulas in plain text with Unicode, never LaTeX: v = s/t, s = ½ · a · t², m/s², kg·m/s, Δt, ·, ≈. Never use $ signs or backslashes.
 - overview: 3 to 5 sentences on what the topics are and how they connect.
-- notes: one ## heading per topic, in my order. For each: the physical quantities (name, symbol, unit), the laws and formulas each on its own line with what every letter means and its unit, how to read the related graphs, the typical mistakes (especially units), and one or two fully solved examples under ### Vzorový příklad, written step by step like the solutions.
+- notes: one ## heading per topic, in my order. For each: the physical quantities (name, symbol, unit), the laws and formulas each on its own line with what every letter means and its unit, how to read the related graphs, the typical mistakes (especially units), and one or two fully solved examples under a ### Solved example heading, written step by step like the solutions.
 - visuals: graphs or diagrams that are essential (for example a v–t graph or a force diagram), described so I can sketch them; otherwise [].
 - exercises: 12 to 18 exercises that cover every topic, ordered from easy to hard:
   - level 1 (about a third): one formula, values already in SI units.
@@ -350,8 +361,8 @@ export function profileLine(subject) {
 }
 
 /**
- * The lesson prompt of a subject: its plan template, the subject profile and the plan's extra instructions,
- * then highlights read from a .docx or the student's key topics, so the AI works from exactly that text.
+ * The lesson prompt of a subject: its plan template, the subject profile, the style line for young students
+ * and the plan's extra instructions, then highlights read from a .docx or the student's key topics, so the AI works from exactly that text.
  *
  * @param {object} subject The subject.
  * @param {{ highlights?: string, topics?: string }} [input] Text to build the lesson from.
@@ -360,7 +371,8 @@ export function profileLine(subject) {
 export function promptFor(subject, { highlights = '', topics = '' } = {}) {
   // A function replacer keeps `$&` and similar in a subject name literal.
   const base = fillStudent(planOf(subject).prompt.replaceAll('{subject}', () => subject.name));
-  const prompt = [base, profileLine(subject), subject.plan?.extra].filter(Boolean).join('\n\n');
+  // The style line for young students sits after the profile so the extra instructions of the plan still come last.
+  const prompt = [base, profileLine(subject), audienceText(), subject.plan?.extra].filter(Boolean).join('\n\n');
   if (highlights) return `${prompt}\n\nTHE HIGHLIGHTED PARTS:\n<<<\n${highlights}\n>>>`;
   return topics.trim() ? `${prompt}\n\nMY KEY TOPICS:\n<<<\n${topics.trim()}\n>>>` : prompt;
 }
@@ -405,26 +417,68 @@ export function repairJson(text) {
   return out.replace(/,(\s*[}\]])/g, '$1');
 }
 
-export function extractJson(text) {
-  const raw = String(text || '');
-  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const body = fence && fence[1].includes('{') ? fence[1] : raw;
-  const start = body.indexOf('{');
-  const end = body.lastIndexOf('}');
-  if (start < 0 || end <= start) throw new Error('No JSON found. Copy the whole answer, including the part in the code block.');
-  const slice = body.slice(start, end + 1);
+/** A fenced code block in a chat answer: the capture is the text between the fences, with or without a `json` tag. */
+const CODE_FENCE = /```(?:json)?\s*([\s\S]*?)```/gi;
+
+/**
+ * Parses text as JSON without throwing.
+ *
+ * @param {string} text Candidate JSON.
+ * @returns {{ data: unknown } | { error: Error }} The parsed value, or the parse error.
+ */
+function attemptParse(text) {
   try {
-    return JSON.parse(slice);
-  } catch {
-    try {
-      return JSON.parse(repairJson(slice));
-    } catch (e) {
-      throw new Error(`The answer is not valid JSON (${e.message}). Ask the AI to "send the same JSON again, valid".`);
-    }
+    return { data: JSON.parse(text) };
+  } catch (error) {
+    return { error };
   }
 }
 
-const str = (v, max = 20000) => (typeof v === 'string' ? v.trim().slice(0, max) : typeof v === 'number' ? String(v) : '');
+/**
+ * Parses the outermost {...} span of a text, repairing the usual chat-app damage when plain parsing fails.
+ *
+ * @param {string} body Text that may hold one JSON object (a code block's content, or a whole answer).
+ * @returns {{ data: unknown } | { error: Error } | null} The result, or null when the text has no {...} span.
+ */
+function parseOuterObject(body) {
+  const start = body.indexOf('{');
+  const end = body.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  const span = body.slice(start, end + 1);
+  const plain = attemptParse(span);
+  return plain.error ? attemptParse(repairJson(span)) : plain;
+}
+
+/**
+ * Finds the JSON object in an AI answer. Every fenced code block is tried in order, then the outermost
+ * {...} span of the whole text, and the first one that parses and satisfies `want` is returned. So an
+ * example block, or a block that is not valid JSON, before the real answer does not hide it.
+ *
+ * @param {string} text The AI's whole answer (prose, code fences and all).
+ * @param {(data: object) => boolean} [want] Accepts or rejects a parsed object (for example "has a profile");
+ *   by default every parsed object is accepted.
+ * @returns {object} The parsed object.
+ * @throws {Error} With a message for the student: no JSON found (or none that `want` accepts), or the first
+ *   candidate's parse error when none could be parsed.
+ * @example
+ * extractJson('Here:\n```json\n{"profile": "..."}\n```', data => 'profile' in data);
+ */
+export function extractJson(text, want = () => true) {
+  const raw = String(text || '');
+  const blocks = [...raw.matchAll(CODE_FENCE)].map(match => match[1]).filter(block => block.includes('{'));
+  let failure = null;
+  for (const body of [...blocks, raw]) {
+    const parsed = parseOuterObject(body);
+    if (!parsed) continue;
+    if (parsed.error) failure ??= parsed.error;
+    else if (want(parsed.data)) return parsed.data;
+  }
+  if (failure) throw new Error(`The answer is not valid JSON (${failure.message}). Ask the AI to "send the same JSON again, valid".`);
+  throw new Error('No JSON found. Copy the whole answer, including the part in the code block.');
+}
+
+// Text from the AI, cut by code point so no emoji is split (a lone surrogate would make every later data-file save fail).
+const str = (v, max = 20000) => (typeof v === 'string' ? clip(v, max) : typeof v === 'number' ? String(v) : '');
 const slideNo = v => (Number.isInteger(Number(v)) && Number(v) > 0 && Number(v) < 1000 ? Number(v) : null);
 const list = v => (Array.isArray(v) ? v : []);
 export const VISUAL_KINDS = ['photo', 'painting', 'statue', 'building', 'map', 'diagram', 'chart', 'other'];
