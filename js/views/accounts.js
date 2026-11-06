@@ -22,8 +22,9 @@ function welcome() {
     <p class="accounts-sub">One place for every subject.</p>
     <ol class="steps">
       <li><span><strong>Create your account</strong>Just a name. Everything is saved under it on this device.</span></li>
-      <li><span><strong>Keep notes per subject</strong>Languages is ready. Add your own subjects, or start from a kit such as Maths or Chemistry.</span></li>
-      <li><span><strong>Learn with AI and the language apps</strong>Tutors that know your notes, plus French and English practice.</span></li>
+      <li><span><strong>Answer a few short questions</strong>Get started asks your age, year, country and subjects, so every answer fits you.</span></li>
+      <li><span><strong>Keep notes per subject</strong>Add your own subjects, or start from a kit such as Maths or Chemistry.</span></li>
+      <li><span><strong>Learn with AI</strong>Tutors that know your notes, a plan for each subject and a checker for your tests.</span></li>
     </ol>
     ${nameForm(html`Create account${icon('chevronRight')}`)}
     ${restoreButton()}`;
@@ -69,7 +70,8 @@ export function accountsView(app) {
         const name = input.value.trim().replace(/\s+/g, ' ');
         if (!name) return showError('Enter a name to continue.');
         if (store.nameTaken(name)) return showError(`There is already an account called ${name}.`);
-        app.signIn(store.createAccount(name).id);
+        // A brand new account has no profile yet, so it opens the Get started questions instead of an empty Home.
+        app.signIn(store.createAccount(name).id, { next: 'welcome' });
       });
 
       const add = root.querySelector('[data-add]');

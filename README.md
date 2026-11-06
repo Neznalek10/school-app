@@ -1,8 +1,8 @@
 # School-app
 
-A study hub for one student: your subjects, notes, tests and homework, AI assistants that know how your class works, and practice apps for languages, chemistry naming and maths. Everything runs on your own computer. Your progress is saved in one readable file that you can back up or move to another computer with git.
+A study hub for any student, from the first years of primary school up: your subjects, notes, tests and homework, AI assistants that know your age and how your class works, a photo checker for marked tests, and practice apps for languages, chemistry naming and maths. Everything runs on your own computer. Your progress is saved in one readable file that you can back up or move to another computer with git.
 
-It works for any school in any country. The interface is in English or Czech, the AI assistants answer in any of 32 languages, and dates, weeks and holidays follow your country. It started at a Czech secondary school (gymnázium), so Czech accounts also get Czech-only extras: the chemistry naming trainer (Názvosloví), the Czech and ZSV starter kits, Czech maths and physics conventions in the lesson prompts, and the MŠMT school-year calendar. Other countries get neutral kits and prompts instead.
+It works for any school in any country. The interface is in English or Czech, the AI assistants answer in any of 32 languages, and dates, weeks and holidays follow your country. Czech accounts also get Czech-only extras: the chemistry naming trainer (Názvosloví), the Czech and ZSV starter kits, Czech maths and physics conventions in the lesson prompts, and the MŠMT school-year calendar. Other countries get neutral kits and prompts instead.
 
 ## Contents
 
@@ -19,7 +19,9 @@ It works for any school in any country. The interface is in English or Czech, th
 
 ## What it does
 
-**Subjects you build yourself.** A new account starts with one subject, Languages, which opens a French course and an English vocabulary trainer. You add the rest. The New subject sheet offers optional starter kits (Mathematics, Physics, Chemistry, History, Biology, Geography, Computer science, plus Czech and ZSV for Czech accounts or Language and literature and Social studies for everyone else) that fill in the icon, colour, study plan and built-in tools. You can also start from an empty subject.
+**A short interview that sets everything up.** A new account opens "Get started": one question per screen about your languages, country, age, school year and stage, school, this year's subjects and your goals. An AI (in the app with a key, or ChatGPT, Gemini or Claude by copy and paste) then plans your school year: every subject gets a profile, a study plan, a topic outline in teaching order and, where it fits, a built-in practice app. You check a preview and apply it. You can also skip the AI and just create the subjects, or skip the interview and come back later from the Home card or Account › About you.
+
+**Subjects you build yourself.** You can always add more subjects. The New subject sheet offers optional starter kits (Mathematics, Physics, Chemistry, History, Biology, Geography, Computer science, French, English, plus Czech and ZSV for Czech accounts or Language and literature and Social studies for everyone else) that fill in the icon, colour, study plan and built-in tools. You can also start from an empty subject.
 
 **An AI interview that personalises each subject.** Every subject has a "Set up this subject" assistant. It asks one question at a time: what the course covers, your main sources, what tests look like, how your teacher grades, what you find hard and what you want to reach. It ends with a setup proposal. You check a preview, apply it, and from then on every assistant, prompt and lesson for that subject uses this profile. You can run the interview inside the app or copy it into ChatGPT or Gemini.
 
@@ -29,18 +31,21 @@ It works for any school in any country. The interface is in English or Czech, th
 - **Tests and homework** table across all subjects, with a page per item for the description, study material and grade.
 - **Notes** in light Markdown, saved automatically.
 - **Sources**: websites, uploaded files (PDF, images, text) and book references.
+- **Topics this year**: the outline from Get started, at the top of the Lessons tab. Tick a topic when it is done.
 - **Lessons**: give a presentation, a worksheet or textbook pages to an AI with the subject's prompt, paste the answer back, and get notes, a timeline, key terms, questions and flashcards. Maths and physics lessons become exercises with checked answers, hints and step-by-step solutions on request.
 - **AI assistants**: Tutor, Quiz me, Study sheet, Research and Check my work, plus your own. Each one can read all your notes for the subject, one note, or none.
 
+**Check a test from a photo.** Photograph a marked test (or a blank one) from the subject's Practice tab or from the test's own page. Add up to 8 photos. The AI reads every question, compares your answer with the correct one, and shows each question with its verdict, the correct answer, why, and a tip for next time. Wrong answers stay hidden at first, so you can try again before you look. If the AI misread a question or your handwriting, fix the text and recheck just that question. One tap turns your mistakes into flashcards. Results are saved with the subject and the test; the photos are never stored. Questions the AI could not read clearly are marked.
+
 **Practice apps.**
-- French course with lessons, vocabulary and conjugation drills, in Czech or English (Settings › I speak).
-- English vocabulary trainer for any word list you import (CSV, JSON or pasted text).
+- French course with lessons, vocabulary and conjugation drills, in Czech or English (Settings › I speak). Add it with the French kit.
+- English vocabulary trainer for any word list you import (CSV, JSON or pasted text). Add it with the English kit.
 - Názvosloví: 1,382 Czech inorganic compounds and all 118 elements, with theory pages and a periodic table.
 - Číselné soustavy: number system conversions with generated exercises (Computer science kit).
 
 **Nothing typed is lost.** Notes save as you type. Every other form and text box (a new test, source, subject, assistant, lesson paste, chat message, setup answer) keeps a draft when you close it, switch apps on your phone or reload. It shows "Draft restored" with a Discard button, and the draft is removed once you save.
 
-**Made for your country and language.** Account › Appearance sets the interface language (English or Czech, following your browser at first). Account › AI assistants sets the answer language (32 languages) and "Your school and year", which every AI prompt uses to pitch its answers at your level. Account › Calendar sets the country, which decides the holidays, the first day of the week and the date and number formats.
+**Made for your country and language.** Account › Appearance sets the interface language (English or Czech, following your browser at first). Account › AI assistants sets the answer language (32 languages). Account › About you holds your Get started answers, which every AI prompt uses to pitch its answers at your age and level: young students get very short sentences and simple words. Account › Calendar sets the country, which decides the holidays, the first day of the week and the date and number formats.
 
 **Works without an AI key.** Every assistant and lesson prompt can be copied as one ready message for ChatGPT, Gemini or Claude, with your notes included.
 
@@ -145,13 +150,13 @@ The shortcut remembers where the folder is. After moving the folder, run `--inst
 ## First steps
 
 1. Open the app and type your name. This creates your account (only a name, no password, no sign-up).
-2. Your account has one subject, Languages. Open it to reach the French course and the English vocabulary trainer.
-3. Click **New subject**. Pick a starter kit under "Start from", or leave it on None, and give the subject a name.
+2. Answer the Get started questions. On the last step, click **Build my subjects** (with an AI key) or **Copy prompt**, paste it into ChatGPT, Gemini or Claude, and paste the answer back. Check the preview and click **Apply**. Your subjects appear on Home with their topic outlines.
+3. To add another subject later, click **New subject**. Pick a starter kit under "Start from", or leave it on None, and give the subject a name.
 4. The subject's setup page opens. Choose:
    - **Interview in the app**, if you have set up an AI key (see below), or
    - **Use ChatGPT or Gemini**: copy the prompt, paste it into the chat, answer the questions there, and paste the final answer back into the box.
 5. Check the preview and click **Apply**. The subject now has its profile, study plan, tailored assistants and tools.
-6. Add your next test in the subject's Calendar. Assistants see upcoming tests and use them when they help you.
+6. Add your next test in the subject's Calendar. Assistants see upcoming tests and use them when they help you. When the test comes back marked, open it and click **Check my marked test**.
 7. Open Account › Calendar and check the country. In the Czech Republic, also pick your school's district so the spring break shows up.
 
 To change a subject's setup later, open the subject and click **Profile and setup**.
@@ -160,7 +165,7 @@ To change a subject's setup later, open the subject and click **Profile and setu
 
 The assistants need an AI service. You have three options.
 
-**OpenRouter (default, free models available).**
+**OpenRouter (default, free models available).** OpenRouter accounts are for adults: if you are under 18, ask a parent to create the key.
 1. Create an account at [openrouter.ai](https://openrouter.ai/) and create an API key.
 2. In the app, open **Account**, paste the key under AI settings and save. The default model is `openrouter/free`, which costs nothing.
 3. With the local server running, the key is saved in `.env` in the project folder ("Saved in .env on this computer") and filled in automatically next time.
@@ -233,6 +238,7 @@ Never push `data/` to a public repository: it contains your notes and grades.
 | `--verbose` | `serve.py` option | off | Logs every request. Request bodies and keys are never logged. |
 | `SCHOOL_APP_BROWSER` | environment, read by `launcher.py` | automatic | Browser command the shortcut uses. |
 | AI address, model, answer language | Account page | OpenRouter, `openrouter/free`, English | Where AI requests go and how assistants answer. |
+| Photo model | Account page | empty (the main model) | Model for the photo test checker. Pick one that reads images if the main model does not. Photos sent to a plain `http://` address on another computer travel unencrypted; the checker warns about it. |
 
 "Forget key" in Account removes the key from `.env` and from this browser. Another browser on the same computer that still holds the key saves it again when it opens the app, so clear it there too. Keys for services other than OpenRouter stay only in the browser where you typed them.
 
@@ -251,6 +257,8 @@ Never push `data/` to a public repository: it contains your notes and grades.
 **The calendar shows no holidays.** Check Account › Calendar: the country may be set to None, or Public holidays may be hidden. For countries other than the Czech Republic the app needs the internet once per year to download them. It shows nationwide public holidays only, not regional ones.
 
 **The AI says the key is wrong.** Open Account, paste the key again and use **Test**. For OpenRouter the address must be `https://openrouter.ai/api/v1`.
+
+**The photo checker says the model may not read photos.** The chosen model only reads text. In Account › AI assistants, set **Photo model** to a model that reads images (on OpenRouter, filter the model list by image input), then check again. Without a key, use **Copy prompt** and attach the photos in ChatGPT, Gemini or Claude yourself.
 
 **The Desktop shortcut does nothing.** Right-click it and choose **Allow Launching**. If the folder was moved, run `venv/bin/python launcher.py --install` again. Errors appear as a notification and in `~/.local/state/school-app/server.log`.
 

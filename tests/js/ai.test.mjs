@@ -1,14 +1,21 @@
 /**
- * Tests for js/ai.js and promptFor in js/study.js: subject profile in prompts, `$&` safety,
- * and the chat() client (timeout over the body, array content, key rules, key masking).
+ * Tests for js/ai.js and promptFor in js/study.js: subject profile and student style line in prompts,
+ * `$&` safety, the chat() client (timeout over the body, array content, key rules, key masking, readable
+ * errors) and the photo helpers.
  *
- * Responsibility: protect the plan.md section 6 "js/ai.js, js/study.js" contract. No network: chat() gets a
- * fake fetcher that records what it was called with.
+ * Responsibility: protect the AI client contract. No network: chat() gets a fake fetcher that records what
+ * it was called with. Tests that change the locale or the AI settings restore them before they end, because
+ * test files share that state.
  */
 import { test, assert } from './harness.mjs';
-import { chat, systemPrompt, externalPrompt, profileLine, httpError, maskKeys, AiError } from '../../js/ai.js';
+import {
+  chat, systemPrompt, externalPrompt, profileLine, httpError, maskKeys, notesContext, AiError,
+  visionSettings, imageMessages, PHOTO_TIMEOUT_MS, PHOTO_MODEL_HINT, DEFAULT_AI,
+} from '../../js/ai.js';
 import { setupAppliedText } from '../../js/views/setup-apply.js';
 import { promptFor } from '../../js/study.js';
+import { store } from '../../js/store.js';
+import { setLocale, studentText } from '../../js/locale.js';
 
 /** Minimal AbortController stand-in: gjs has none (browsers and node do), and chat() needs one. */
 globalThis.AbortController ??= class {
@@ -203,4 +210,114 @@ test('a key shorter than 6 characters is not masked by value', () => {
 test('setupAppliedText mentions lessons only when some were added', () => {
   assert.equal(setupAppliedText({ name: 'Chemistry' }, { lessons: 0 }), 'Chemistry is set up.');
   assert.equal(setupAppliedText({ name: 'Computer science' }, { lessons: 1 }), 'Computer science is set up and 1 lesson added.');
+});
+
+test('chat maps an error code in a 200 answer like the same HTTP status', async () => {
+  const ai = { url: 'https://x.test/v1', model: 'm' };
+  const auth = await chatError(ai, fakeFetch({ error: { code: 401, message: 'No auth credentials found' } }));
+  assert.equal(auth.kind, 'auth');
+  assert.equal(auth.message, 'The AI refused the key. Check it in Account.');
+  const limit = await chatError(ai, fakeFetch({ error: { code: '429', message: 'Rate limited' } }));
+  assert.equal(limit.kind, 'limit');
+  assert.equal((await chatError(ai, fakeFetch({ error: { code: 402 } }))).kind, 'limit');
+  assert.equal((await chatError(ai, fakeFetch({ error: { code: 403 } }))).kind, 'auth');
+});
+
+test('a 403 says the request was refused, a 401 says the key was', () => {
+  assert.equal(httpError(403).message, 'The AI refused the request. Check the key in Account, or try another model.');
+  assert.equal(httpError(401).message, 'The AI refused the key. Check it in Account.');
+  assert.equal(httpError(403).kind, 'auth');
+});
+
+test('an error message that is not text never prints as [object Object]', async () => {
+  const ai = { url: 'https://x.test/v1', model: 'm' };
+  const e = await chatError(ai, fakeFetch({ error: { message: { detail: 'nested' } } }));
+  assert.equal(e.kind, 'format');
+  assert.equal(e.message, 'The AI sent back an empty answer.');
+  const plain = await chatError(ai, fakeFetch({ error: { code: 500, message: 'Upstream failed' } }));
+  assert.equal(plain.message, 'Upstream failed');
+});
+
+test('an answer cut off before any text says the model ran out of room', async () => {
+  const body = { choices: [{ message: { content: '' }, finish_reason: 'length' }] };
+  const e = await chatError({ url: 'https://x.test/v1', model: 'm' }, fakeFetch(body));
+  assert.equal(e.kind, 'format');
+  assert.equal(e.message, 'The AI ran out of room before finishing. Try again, or pick a model with a larger limit in Account.');
+});
+
+test('a cut-off answer that has some text is still returned', async () => {
+  const body = { choices: [{ message: { content: 'Half an ans' }, finish_reason: 'length' }] };
+  assert.equal(await chat({ url: 'https://x.test/v1', model: 'm' }, MESSAGES, { fetcher: fakeFetch(body) }), 'Half an ans');
+});
+
+test('the error excerpt of an unknown HTTP error is cut without splitting an emoji', () => {
+  const body = `${'x'.repeat(139)}😀 more`;
+  const detail = httpError(500, body).message;
+  assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(detail));
+  assert.ok(detail.includes('😀'));
+});
+
+test('notesContext cuts a long note by code point', () => {
+  const note = { title: 'Emoji', body: `${'a'.repeat(996)}${'😀'.repeat(10)}`, updated: 1 };
+  const { text } = notesContext([note], 1000);
+  assert.ok(text.endsWith('[cut]'));
+  assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(text));
+});
+
+test('photo constants: a longer timeout and a hint that names the setting', () => {
+  assert.equal(PHOTO_TIMEOUT_MS, 150000);
+  assert.ok(PHOTO_MODEL_HINT.includes('Photo model'));
+  assert.equal(DEFAULT_AI.visionModel, '');
+});
+
+test('imageMessages sends the text first, then one image_url part per photo', () => {
+  const messages = imageMessages('Check this', ['data:image/jpeg;base64,AAA', 'data:image/jpeg;base64,BBB']);
+  assert.deepEqual(messages, [{
+    role: 'user',
+    content: [
+      { type: 'text', text: 'Check this' },
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AAA' } },
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,BBB' } },
+    ],
+  }]);
+  assert.deepEqual(imageMessages('Only text', [])[0].content, [{ type: 'text', text: 'Only text' }]);
+});
+
+test('systemPrompt and externalPrompt add the style line for a young student after the profile', () => {
+  setLocale({ language: 'en', country: 'DE', student: { age: 7 } });
+  try {
+    const subject = { name: 'Math', profile: PROFILE };
+    const style = 'The student is about 7 years old and still learning to read and write';
+    const system = systemPrompt({ assistant: ASSISTANT, subject });
+    assert.ok(system.indexOf(style) > system.indexOf('About Math in my class') && system.indexOf(style) < system.indexOf('Always answer'));
+    const external = externalPrompt({ assistant: ASSISTANT, subject });
+    assert.ok(external.indexOf(style) > external.indexOf('About Math in my class') && external.indexOf(style) < external.indexOf('Always answer'));
+    assert.ok(external.startsWith(`I am ${studentText()}.`));
+  } finally {
+    setLocale({});
+  }
+});
+
+test('systemPrompt has no style line for a student of 15 or older', () => {
+  setLocale({ language: 'en', student: { age: 17 } });
+  try {
+    assert.ok(!systemPrompt({ assistant: ASSISTANT, subject: { name: 'Math' } }).includes('The student is'));
+  } finally {
+    setLocale({});
+  }
+});
+
+test('visionSettings uses the photo model when set and the main model when empty or blank', () => {
+  const previous = store.settings.ai;
+  try {
+    store.settings.ai = { ...DEFAULT_AI, model: 'main-model', visionModel: '  photo-model ' };
+    assert.equal(visionSettings().model, 'photo-model');
+    store.settings.ai = { ...DEFAULT_AI, model: 'main-model', visionModel: '   ' };
+    assert.equal(visionSettings().model, 'main-model');
+    store.settings.ai = { url: 'https://x.test/v1', model: 'main-model' };
+    assert.equal(visionSettings().model, 'main-model');
+    assert.equal(visionSettings().url, 'https://x.test/v1');
+  } finally {
+    store.settings.ai = previous;
+  }
 });

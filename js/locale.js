@@ -1,9 +1,12 @@
 /**
- * The account's interface language and country, and everything formatted by them: dates, numbers and weeks.
+ * The account's interface language, country and student profile, and everything formatted by them: dates,
+ * numbers, weeks and the "who is the student" text of every AI prompt.
  *
  * The store calls setLocale when an account signs in or its settings change; views and js/events.js format
- * through these helpers instead of a fixed "en-GB". Holds no account data itself, so it imports nothing.
+ * through these helpers instead of a fixed "en-GB", and prompt builders call studentText and audienceText.
+ * Holds no account data itself. Imports js/student.js (a pure module) to clean and describe the profile.
  */
+import { normalizeStudent, describeStudent, audienceLine, SCHOOL_MAX } from './student.js';
 
 /** Interface languages, each with a dictionary in js/i18n/ (English needs none: views are written in it). */
 export const UI_LANGUAGES = [
@@ -15,43 +18,101 @@ export const UI_LANGUAGES = [
 const SUNDAY_FIRST = new Set('AG AS BD BR BS BT BW BZ CA CN CO DM DO ET GT GU HK HN ID IL IN JM JP KE KH KR LA MH MM MO MT MX MZ NI NP PA PE PH PK PR PT PY SA SG SV TH TT TW UM US VE VI WS YE ZA ZW'.split(' '));
 const SATURDAY_FIRST = new Set('AE AF BH DJ DZ EG IQ IR JO KW LY OM QA SD SY'.split(' '));
 
-let current = { language: 'en', country: '', school: '' };
+/** Two-letter codes that look like countries but are placeholders ("Unknown Region"), so they count as no country. */
+const PLACEHOLDER_COUNTRIES = new Set(['ZZ', 'XX']);
+
+/** Countries whose English name takes "the" although the name itself does not show it (US, UK, Netherlands, ...). */
+const COUNTRIES_WITH_THE = new Set(['US', 'GB', 'NL', 'AE', 'PH', 'DO', 'BS', 'GM', 'CF', 'CD', 'CG']);
+
+/** Name patterns that take "the": "United States", "Cayman Islands", "Dominican Republic". */
+const NAME_TAKES_THE = /^United\b|\bIslands$|\bRepublic$/;
+
+let current = { language: 'en', country: '', student: normalizeStudent({}) };
 
 /**
- * Sets the language, country and school every later format and prompt uses.
+ * Looks up the English name of a well-formed country code with Intl (fallback "none": an unknown code has no name).
  *
- * @param {{language?: string, country?: string, school?: string}} settings Interface language code, country
- *   code, and the student's own description of their school ("" for the default).
+ * @param {string} code Two capital letters.
+ * @returns {string} The name, or '' when the code is not a country or this browser has no Intl.DisplayNames.
+ */
+function countryNameOf(code) {
+  if (typeof Intl.DisplayNames !== 'function') return '';
+  return new Intl.DisplayNames(['en'], { type: 'region', fallback: 'none' }).of(code) || '';
+}
+
+/**
+ * The country as it reads after "in": its English name with "the" where English needs it ("the United States").
+ *
+ * @param {string} code A valid country code.
+ * @returns {string} For example "Germany" or "the Netherlands"; the code itself when this browser has no
+ *   Intl.DisplayNames.
+ */
+function countryPhrase(code) {
+  const name = countryNameOf(code);
+  if (!name) return code;
+  return COUNTRIES_WITH_THE.has(code) || NAME_TAKES_THE.test(name) ? `the ${name}` : name;
+}
+
+/**
+ * Tells whether a value is a real country code. Browsers without Intl.DisplayNames cannot tell, so any
+ * well-formed code is accepted there.
+ *
+ * @param {unknown} code Candidate country code.
+ * @returns {boolean} True for two capital letters that name a country.
+ */
+function isCountryCode(code) {
+  if (typeof code !== 'string' || !/^[A-Z]{2}$/.test(code) || PLACEHOLDER_COUNTRIES.has(code)) return false;
+  return typeof Intl.DisplayNames !== 'function' || countryNameOf(code) !== '';
+}
+
+/**
+ * Sets the language, country and student profile every later format and prompt uses.
+ *
+ * @param {{language?: string, country?: string, school?: string, student?: object}} settings Interface language
+ *   code; country code (an unknown code counts as no country); the student profile (cleaned with
+ *   normalizeStudent); and the legacy school text, used as the profile's school when the profile has none.
  * @returns {void}
  */
-export function setLocale({ language, country, school } = {}) {
+export function setLocale({ language, country, school, student } = {}) {
+  const profile = normalizeStudent(student);
+  if (!profile.school) profile.school = normalizeStudent({ school }).school;
   current = {
     language: UI_LANGUAGES.some(l => l.code === language) ? language : 'en',
-    country: /^[A-Z]{2}$/.test(country || '') ? country : '',
-    school: typeof school === 'string' ? school.trim().replace(/\s+/g, ' ').slice(0, MAX_SCHOOL) : '',
+    country: isCountryCode(country) ? country : '',
+    student: profile,
   };
 }
 
 /** Longest school description kept; it goes into every AI prompt. */
-export const MAX_SCHOOL = 120;
+export const MAX_SCHOOL = SCHOOL_MAX;
 
 /** True for the Czech Republic, whose school conventions (and Czech-only tools) the app has built in. */
 export const isCzechSchool = () => current.country === 'CZ';
 
 /**
- * Who the student is, as AI prompts say it after "I am" or "for": the student's own words when set.
+ * Who the student is, as AI prompts say it after "I am" or "for", built from the profile and the country.
  *
- * @returns {string} For example "a student in the first year of a Czech gymnázium" or
- *   "a secondary school student in Germany".
+ * @returns {string} For example "an 8-year-old student in year 2 of primary school in Germany",
+ *   "a school student in the United States" (country only) or "a school student" (nothing known).
  */
 export function studentText() {
-  if (current.school) return current.school;
-  if (isCzechSchool()) return 'a student in the first year of a Czech gymnázium';
-  if (!current.country) return 'a secondary school student';
-  let name = current.country;
-  try { name = new Intl.DisplayNames(['en'], { type: 'region' }).of(current.country) || name; } catch { /* keep the code */ }
-  return `a secondary school student in ${name}`;
+  // The country is always a valid code here (setLocale checked it); without Intl names the code itself is shown.
+  return describeStudent(current.student, current.country ? countryPhrase(current.country) : '');
 }
+
+/**
+ * The style line for young students that prompts add after the student's description.
+ *
+ * @returns {string} A sentence for students under 15, or '' when none applies.
+ */
+export const audienceText = () => audienceLine(current.student);
+
+/**
+ * The active student profile.
+ *
+ * @returns {import('./student.js').Student} A copy; changing it does not change the locale.
+ */
+export const currentStudent = () => ({ ...current.student, subjects: [...current.student.subjects] });
 
 /**
  * Adapts a built-in prompt to the account's country: lines marked [CZ] are kept only for Czech schools,

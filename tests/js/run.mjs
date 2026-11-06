@@ -12,6 +12,7 @@ import { run } from './harness.mjs';
 /** Test files in run order. harness.test.mjs goes first so a broken harness shows before feature tests. */
 const TEST_FILES = [
   'harness.test.mjs',
+  'text.test.mjs',
   'snapshot.test.mjs',
   'client.test.mjs',
   'engine.test.mjs',
@@ -25,6 +26,14 @@ const TEST_FILES = [
   'i18n.test.mjs',
   'ai.test.mjs',
   'apps.test.mjs',
+  'student.test.mjs',
+  'curriculum.test.mjs',
+  'testcheck.test.mjs',
+  'testcheck-view.test.mjs',
+  'images.test.mjs',
+  'study.test.mjs',
+  'store.test.mjs',
+  'welcome.test.mjs',
   'integration.test.mjs',
 ];
 

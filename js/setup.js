@@ -7,15 +7,18 @@
  * renders preview lines.
  *
  * Fits in: js/subjects.js puts `setupAssistant` into assistantsOf; js/views/setup.js and js/views/chat.js
- * call parseSetup, setupSummary and applySetup. Uses TEMPLATES and extractJson from js/study.js.
+ * call parseSetup, setupSummary and applySetup. Uses TEMPLATES and extractJson from js/study.js, the student
+ * description from js/locale.js and `clip` from js/text.js (text caps never split an emoji).
  *
  * Invariants: this file must not import js/store.js or js/subjects.js (that would create the cycle
  * store -> subjects -> setup -> store), so applySetup receives its id generator from the caller.
+ * applySetup changes the subject only after everything that can fail has succeeded.
  * The prompt contains no personal names and no `{subject}` placeholder, because the chat replaces that
  * placeholder everywhere in an assistant prompt, which would damage the instructions about it.
  */
 import { TEMPLATES, extractJson } from './study.js';
-import { studentText, isCzechSchool } from './locale.js';
+import { studentText, audienceText, isCzechSchool } from './locale.js';
+import { clip } from './text.js';
 
 /** Id of the setup assistant; it is a preset, so it is never stored on the subject. */
 export const SETUP_ID = 'setup';
@@ -90,14 +93,19 @@ export function setupPrompt(subject) {
   const current = subject.profile
     ? `\nThe student already did a setup. The current profile is: ${subject.profile}\nStart by checking what is still true and what changed, and keep what is still right.\n`
     : '';
-  return `You set up the subject "${subject.name}" in a study app for ${studentText()}. You interview the student about this subject in their class, so the app's assistants and learning plans fit it. At the end you produce one JSON setup.
+  // The audience line (only for young students) tells the interviewer how simply to write its questions.
+  const intro = [
+    `You set up the subject "${subject.name}" in a study app for ${studentText()}. You interview the student about this subject in their class, so the app's assistants and learning plans fit it. At the end you produce one JSON setup.`,
+    audienceText(),
+  ].filter(Boolean).join('\n');
+  return `${intro}
 ${current}
 INTERVIEW RULES
 - Ask exactly one question per message. Never put two questions in one message and never send a list of questions. Keep each message short, friendly and easy to read on a phone.
 - Plan about 6 to 10 questions in total. Adapt: follow up on vague or surprising answers, and skip anything the student already told you.
 - When it helps, add two or three example answers, but let the student answer in their own words.
-- Cover these topics, in a natural order: what the course covers this year, the main sources (textbook, presentations, worksheets, Google Classroom), how tests look and how they are graded, what the teacher cares about most, what the student finds hard, the student's goals, and the language the student wants answers in.
-- If the student writes "done" or "hotovo" at any time, stop asking and build the setup from what you know now. Say in one sentence which parts you had to guess.
+- Cover these topics, in a natural order: what the course covers this year, the main sources (textbook, worksheets, presentations, an online classroom), how tests look and how they are graded, what the teacher cares about most, what the student finds hard, the student's goals, and the language the student wants answers in.
+- If the student writes "done" (or the same word in their own language) at any time, stop asking and build the setup from what you know now. Say in one sentence which parts you had to guess.
 - Never invent facts about the teacher, the school or the course. Leave out what you do not know.
 
 ENDING
@@ -142,17 +150,6 @@ export function setupAssistant(subject) {
 }
 
 /**
- * Trims a value to a string of at most `max` characters; non-strings become ''.
- *
- * @param {unknown} value Any JSON value.
- * @param {number} max Maximum length.
- * @returns {string} Trimmed text.
- */
-function text(value, max) {
-  return typeof value === 'string' ? value.trim().slice(0, max) : '';
-}
-
-/**
  * Keeps the entries of `value` that are own keys of `allowed`, without duplicates.
  *
  * @param {unknown} value Expected to be an array of keys; anything else gives [].
@@ -172,33 +169,34 @@ function allowedKeys(value, allowed) {
  * @returns {{ name: string, blurb: string, icon: string, prompt: string, useNotes: boolean } | null} The assistant, or null when it lacks a name or a usable prompt.
  */
 function cleanAssistant(raw, icons) {
-  const name = text(raw?.name, NAME_MAX);
-  const prompt = text(raw?.prompt, PROMPT_MAX);
+  const name = clip(raw?.name, NAME_MAX);
+  const prompt = clip(raw?.prompt, PROMPT_MAX);
   if (!name || prompt.length < PROMPT_MIN) return null;
   const icon = icons.includes(raw.icon) ? raw.icon : FALLBACK_ICON;
-  return { name, blurb: text(raw.blurb, BLURB_MAX), icon, prompt, useNotes: true };
+  return { name, blurb: clip(raw.blurb, BLURB_MAX), icon, prompt, useNotes: true };
 }
 
 /**
  * Parses and cleans the AI's final answer into a SubjectSetup.
  *
  * Tolerates prose around the code block, curly quotes and trailing commas (via extractJson). Unknown
- * templates become 'general', unknown tools and lessons are dropped, extra assistants beyond the limit and
- * assistants without a name or prompt are dropped, extra fields are ignored.
+ * templates become 'general', unknown tools and lessons are dropped (all of them outside the Czech Republic),
+ * extra assistants beyond the limit and assistants without a name or prompt are dropped, extra fields are ignored.
  *
  * @param {string} answer The whole reply of the AI.
- * @param {{ icons: string[] }} options `icons`: the icon names the app has.
+ * @param {{ icons: string[], czech?: boolean }} options `icons`: the icon names the app has; `czech`: true when the
+ *   Czech-only tools and lessons may be kept (defaults to the account's country being the Czech Republic).
  * @returns {{ profile: string, plan: { template: string, extra: string }, assistants: object[], tools: string[], lessons: string[] }} The setup.
  * @throws {Error} With a message for the student when there is no JSON, it is not an object or the profile is missing or too short.
  * @example
  * const setup = parseSetup(reply, { icons: SUBJECT_ICONS });
  */
-export function parseSetup(answer, { icons }) {
+export function parseSetup(answer, { icons, czech = isCzechSchool() }) {
   // Chat replies during the interview have no braces; say what to paste instead of a JSON error.
   if (!String(answer || '').includes('{')) throw new Error(NOT_FINAL_MESSAGE);
   const data = extractJson(answer);
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error(NOT_FINAL_MESSAGE);
-  const profile = text(data.profile, PROFILE_MAX);
+  const profile = clip(data.profile, PROFILE_MAX);
   if (profile.length < PROFILE_MIN) {
     throw new Error(`The setup has no subject profile (at least ${PROFILE_MIN} characters). Ask the AI to finish the interview and send the complete JSON.`);
   }
@@ -209,10 +207,11 @@ export function parseSetup(answer, { icons }) {
     .slice(0, MAX_SETUP_ASSISTANTS);
   return {
     profile,
-    plan: { template, extra: text(data.plan?.extra, EXTRA_MAX) },
+    plan: { template, extra: clip(data.plan?.extra, EXTRA_MAX) },
     assistants,
-    tools: allowedKeys(data.tools, SETUP_TOOLS),
-    lessons: allowedKeys(data.lessons, SETUP_LESSONS),
+    // The built-in tools and lessons are Czech curriculum content: an AI proposal for anyone else cannot switch them on.
+    tools: czech ? allowedKeys(data.tools, SETUP_TOOLS) : [],
+    lessons: czech ? allowedKeys(data.lessons, SETUP_LESSONS) : [],
   };
 }
 
@@ -240,7 +239,7 @@ function freshId(id, taken) {
  *
  * Sets profile, plan and setupAt and adds tools (never removes any). A custom plan prompt from before is dropped, because the chosen
  * template replaces it. Earlier setup-made assistants (fromSetup: true) are replaced; assistants the student
- * made themselves are kept.
+ * made themselves are kept. When it throws (no id generator, ids that cannot be made unique) the subject is left unchanged.
  *
  * @param {object} subject The subject; mutated.
  * @param {object} setup A SubjectSetup from parseSetup.
@@ -253,15 +252,16 @@ function freshId(id, taken) {
  */
 export function applySetup(subject, setup, { now = Date.now(), id } = {}) {
   if (typeof id !== 'function') throw new TypeError('applySetup needs an id generator: pass { id: () => uid(\'c\') }.');
+  // Keep the student's own assistants; only those made by an earlier setup are replaced.
+  const kept = (subject.assistants || []).filter(assistant => !assistant.fromSetup);
+  const taken = new Set([...RESERVED_IDS, ...kept.map(assistant => assistant.id)]);
+  // Ids are generated first: freshId is the only step that can throw, and the subject must stay untouched when it does.
+  const created = setup.assistants.map(assistant => ({ ...assistant, id: freshId(id, taken), fromSetup: true }));
   subject.profile = setup.profile;
   subject.plan = { template: setup.plan.template, ...(setup.plan.extra && { extra: setup.plan.extra }) };
   // Tools are only added: an earlier or legacy tool must not disappear because this interview did not mention it.
   const tools = [...new Set([...(subject.tools || []), ...setup.tools])];
   if (tools.length) subject.tools = tools;
-  // Keep the student's own assistants; only those made by an earlier setup are replaced.
-  const kept = (subject.assistants || []).filter(assistant => !assistant.fromSetup);
-  const taken = new Set([...RESERVED_IDS, ...kept.map(assistant => assistant.id)]);
-  const created = setup.assistants.map(assistant => ({ ...assistant, id: freshId(id, taken), fromSetup: true }));
   subject.assistants = [...kept, ...created];
   subject.setupAt = now;
   return { lessons: [...setup.lessons] };

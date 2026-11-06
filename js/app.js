@@ -5,7 +5,7 @@
  * tab bar, and offers app.go, app.toast, app.sheet, app.confirm and note/subject lookups to the views.
  * Fits in: loaded by index.html as the only entry module; imports the routed views from js/views/ and the store.
  * Invariants: a malformed or unknown hash falls back to home; with no signed-in account only the
- * accounts route renders.
+ * accounts route renders. A brand new account opens the Get started interview instead of Home.
  */
 import { store, uid } from './store.js';
 import { html, icon, applyTheme } from './ui.js';
@@ -24,6 +24,8 @@ import { promptsView } from './views/prompts.js';
 import { chemView, chemQuizView } from './views/chem.js';
 import { exerciseView } from './views/exercises.js';
 import { setupView } from './views/setup.js';
+import { welcomeView } from './views/welcome.js';
+import { testCheckView } from './views/testcheck.js';
 import { syncState, onSyncChange, dismissConflictNotice } from './sync/engine.js';
 import { announceUpdate, watchForUpdates } from './update.js';
 import { setLocale, browserLanguage, uiLanguage } from './locale.js';
@@ -48,6 +50,8 @@ const ROUTES = {
   exercise: exerciseView,
   account: accountView,
   setup: setupView,
+  welcome: welcomeView,
+  testcheck: testCheckView,
 };
 const TABS = [
   { route: 'home', label: 'Home', icon: 'home' },
@@ -86,6 +90,40 @@ export const app = {
     return note;
   },
 
+  /**
+   * Saved photo test checks of one subject.
+   *
+   * @param {string} subjectId The subject's id.
+   * @returns {object[]} Check records, newest first.
+   */
+  checksOf(subjectId) {
+    return store.checks.filter(c => c.subjectId === subjectId).sort((a, b) => b.created - a.created);
+  },
+
+  /**
+   * Stores a check record: replaces the one with the same id, or adds it as new. Saves the account's checks.
+   *
+   * @param {object} record A CheckRecord.
+   * @returns {void}
+   */
+  saveCheck(record) {
+    const at = store.checks.findIndex(c => c.id === record.id);
+    if (at >= 0) store.checks[at] = record;
+    else store.checks.unshift(record);
+    store.save('checks');
+  },
+
+  /**
+   * Deletes a saved check and saves the account's checks. An unknown id changes nothing.
+   *
+   * @param {string} id The record's id.
+   * @returns {void}
+   */
+  deleteCheck(id) {
+    store.checks = store.checks.filter(c => c.id !== id);
+    store.save('checks');
+  },
+
   refreshSide() {
     renderSide();
   },
@@ -98,7 +136,14 @@ export const app = {
     this.render();
   },
 
-  signIn(id) {
+  /**
+   * Signs in to an account and opens the page the address asks for.
+   *
+   * @param {string} id The account id.
+   * @param {{ next?: string }} [options] `next`: the page to open instead of Home when the address is the account picker.
+   * @returns {void}
+   */
+  signIn(id, { next = 'home' } = {}) {
     const before = uiLanguage();
     if (!store.useAccount(id)) return this.go('accounts', { replace: true });
     // The shell was drawn in the welcome screen's language; redraw it when the account uses another one.
@@ -109,7 +154,7 @@ export const app = {
     applyTheme();
     renderSide();
     const route = location.hash.replace(/^#\/?/, '').split(/[/?]/)[0];
-    if (!route || route === 'accounts') this.go('home', { replace: true });
+    if (!route || route === 'accounts') this.go(next, { replace: true });
     else this.render();
   },
 

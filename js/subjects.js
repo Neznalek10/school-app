@@ -1,8 +1,9 @@
 /**
- * Subjects: the default subject, starter kits, tool gating and the assistants of a subject.
+ * Subjects: the starter kits, built-in app options, tool gating and the assistants of a subject.
  *
- * Responsibility: what a new account starts with (Languages only), the optional starter kits offered by the
- * New subject sheet, `hasTool` (replaces the old subject-id special cases) and `assistantsOf`.
+ * Responsibility: what a new account starts with (no subjects), the optional starter kits offered by the
+ * New subject sheet (including the French and English language kits with their built-in apps), `hasTool`
+ * (replaces the old subject-id special cases) and `assistantsOf`.
  *
  * Fits in: js/store.js uses defaultSubjects and addLaterDefaults; js/views/subject.js, chat.js and prompts.js
  * use KITS, subjectFromKit, hasTool and assistantsOf. Uses setupAssistant from js/setup.js.
@@ -13,15 +14,13 @@
  */
 import { setupAssistant } from './setup.js';
 
-// Every new account starts with this; it can be renamed, recoloured or deleted.
-const DEFAULTS = [
-  { id: 'languages', name: 'Languages', icon: 'globe', color: 'blue', apps: ['french', 'english'] },
-];
+// Every new account starts with these subjects: none, the student picks their own in the Get started interview.
+const DEFAULTS = [];
 
 /**
  * Builds the subjects a new account starts with.
  *
- * @returns {object[]} Fresh subject objects (safe to mutate).
+ * @returns {object[]} Fresh subject objects (safe to mutate); empty while DEFAULTS is empty.
  */
 export const defaultSubjects = () => DEFAULTS.map(s => ({ ...s, apps: s.apps ? [...s.apps] : [], assistants: [], created: 0 }));
 
@@ -29,8 +28,18 @@ export const COLORS = ['blue', 'violet', 'red', 'orange', 'teal', 'green', 'brow
 export const SUBJECT_ICONS = ['book', 'math', 'atom', 'flask', 'leaf', 'scroll', 'scale', 'map', 'code', 'globe', 'music', 'palette', 'ball', 'notes'];
 
 /**
+ * Built-in apps a subject can offer, as keys of `subject.apps` -> description shown to the AI when it proposes
+ * subjects (js/curriculum.js lists these). Every key is an app embedded in the subject page.
+ */
+export const APP_OPTIONS = {
+  french: 'French course for learners of French as a foreign language (lessons, grammar, vocabulary)',
+  english: 'Vocabulary trainer for English as a foreign language (imported word lists)',
+};
+
+/**
  * Optional starter kits for the New subject sheet. `plan` is a learning-plan template key, `tools` are
- * built-in tools (see hasTool) and `lessons` are built-in lesson ids the caller adds with addBuiltInLesson.
+ * built-in tools (see hasTool), `apps` are keys of APP_OPTIONS the subject gets, and `lessons` are built-in
+ * lesson ids the caller adds with addBuiltInLesson.
  * `czech` kits are offered only to Czech accounts and `intl` kits only to all others (see kitsFor).
  */
 export const KITS = [
@@ -45,6 +54,8 @@ export const KITS = [
   { id: 'biology', name: 'Biology', icon: 'leaf', color: 'green', plan: 'research' },
   { id: 'geography', name: 'Geography', icon: 'map', color: 'cyan', plan: 'research' },
   { id: 'informatics', name: 'Computer science', icon: 'code', color: 'pink', plan: 'general', lessons: ['soustavy'] },
+  { id: 'french', name: 'French', icon: 'globe', color: 'blue', plan: 'general', apps: ['french'] },
+  { id: 'english', name: 'English', icon: 'globe', color: 'cyan', plan: 'general', apps: ['english'] },
 ];
 
 /** Tools and built-in lessons written in Czech or for Czech school rules: Názvosloví and Číselné soustavy. */
@@ -68,14 +79,15 @@ export function kitsFor(czech) {
  *
  * @param {object|null} kit An entry of KITS, or null for a plain subject.
  * @param {{ name: string, icon: string, color: string, id: string, now?: number }} fields The values chosen in the sheet; `id` is required (callers pass `uid('s')`).
- * @returns {object} The new subject; with a kit it also has `kit`, `plan: {template}` and, when the kit has tools, `tools`.
+ * @returns {object} The new subject; `apps` is a copy of the kit's apps (empty without a kit or apps); with a kit it
+ *   also has `kit`, `plan: {template}` and, when the kit has tools, `tools`.
  * @throws {TypeError} When `id` is missing.
  * @example
  * const subject = subjectFromKit(KITS[0], { name: 'Maths', icon: 'math', color: 'violet', id: uid('s') });
  */
 export function subjectFromKit(kit, { name, icon, color, id, now = Date.now() } = {}) {
   if (typeof id !== 'string' || !id) throw new TypeError('subjectFromKit needs an id: pass { id: uid(\'s\') }.');
-  const subject = { id, name, icon, color, apps: [], assistants: [], created: now };
+  const subject = { id, name, icon, color, apps: [...(kit?.apps || [])], assistants: [], created: now };
   if (!kit) return subject;
   subject.kit = kit.id;
   subject.plan = { template: kit.plan };
