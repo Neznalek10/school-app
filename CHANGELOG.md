@@ -4,6 +4,12 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 The 1.x history lived in the earlier project (school-learning-app). This file starts at 2.0.0.
 
+## [2.6.1] - 2026-11-10
+
+### Changed
+
+- The installed app opens as a normal app window again instead of full screen, so the phone's status bar and navigation bar stay visible and take the app's light or dark colour.
+
 ## [2.6.0] - 2026-11-10
 
 ### Added
