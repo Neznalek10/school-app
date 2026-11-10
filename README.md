@@ -198,6 +198,20 @@ The Czech calendar is built into the app. For any other country, the app downloa
 
 Account › **Back up** downloads one file with your subjects, notes, calendar and sources. **Restore** reads it back. The French and English apps have their own Back up in their settings.
 
+### Sync with GitHub (phone and computers)
+
+Account › **GitHub** keeps all your data (every account, subject, note, test, lesson and practice progress) in a file in your own **private** GitHub repository. Every phone and computer connected to it shares the same data. It works on GitHub Pages too, without the local server. AI keys are never uploaded.
+
+1. On GitHub, create a **private** repository, for example `school-data`.
+2. Create a fine-grained token at github.com › Settings › Developer settings › Fine-grained tokens. Set Repository access to "Only select repositories" with just that repository, and Permissions › Contents to "Read and write".
+3. In the app, open Account › GitHub, enter the repository as `owner/name`, paste the token and click **Connect**.
+
+The first device you connect uploads its data. Connect the device that holds the data you want to keep first. On every other device, the app sees that GitHub already has a file and asks which copy to keep: choose **Use GitHub's copy**.
+
+From then on the app syncs by itself: when it opens, when you come back to it, and a minute after a change. If two devices changed things before syncing, it asks which copy to keep; GitHub keeps every earlier version in the file's history. **Save now** and **Load from GitHub** work by hand. The token stays in the browser where you typed it; anyone who can open the app on that device can use it, so keep it limited to the one repository.
+
+Uploaded files (PDFs, images) are not synced.
+
 ### Moving to another computer
 
 **By hand.** Copy the whole folder, except `venv/`, to the other computer, create the venv there (see Installation) and start the app. Copy `.env` too if you want your AI key there, or type the key again.
