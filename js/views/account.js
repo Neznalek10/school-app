@@ -18,6 +18,7 @@ import { syncState, onSyncChange, syncNow, forgetKey } from '../sync/engine.js';
 import { formatDateTime, studentText, UI_LANGUAGES, uiLanguage } from '../locale.js';
 import { isStudentStarted } from '../student.js';
 import { tr } from '../i18n.js';
+import { githubSection, mountGitHub } from './github-ui.js';
 
 /** Shown for the browser-only storage mode. */
 const BROWSER_STORAGE_TEXT = html`Saved in this browser only. Start the app with <code>python serve.py</code> to keep it in a file you can move to another computer.`;
@@ -117,6 +118,7 @@ function keyNote(state) {
  */
 export function accountView(app) {
   let stopSyncListening = () => {};
+  let stopGitHubListening = () => {};
   const s = store.settings;
   const countries = COUNTRIES.map(code => [code, countryName(code)]).sort((a, b) => a[1].localeCompare(b[1], uiLanguage()));
   const ai = aiSettings();
@@ -201,6 +203,8 @@ export function accountView(app) {
     <h3 class="group-title">Storage</h3>
     <section class="card settings storage-card" data-storage aria-live="polite">${storageCardBody(syncState)}</section>
 
+    ${githubSection()}
+
     <h3 class="group-title">Data</h3>
     <section class="card settings">
       ${row('Back up subjects, notes, calendar and sources', backupHint(s.lastBackup, syncState.mode), html`<div class="setting-buttons"><button class="btn btn-primary btn-sm" data-backup>${icon('download')}Back up</button><button class="btn btn-secondary btn-sm" data-restore>${icon('upload')}Restore</button></div>`)}
@@ -263,8 +267,10 @@ export function accountView(app) {
     /** Stops listening to sync changes when the view is left. */
     leave() {
       stopSyncListening();
+      stopGitHubListening();
     },
     mount(root) {
+      stopGitHubListening = mountGitHub(app, root);
       onSegmented(root, (name, value) => {
         if (name.startsWith('cz-')) s.czech[name.slice(3)] = value === 'on';
         else s[name] = value;

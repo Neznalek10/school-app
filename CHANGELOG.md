@@ -4,6 +4,12 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 The 1.x history lived in the earlier project (school-learning-app). This file starts at 2.0.0.
 
+## [2.6.0] - 2026-11-10
+
+### Added
+
+- Sync with GitHub: Account › GitHub keeps all data in a file in your own private repository, so a phone on GitHub Pages and a computer share it. It syncs by itself when the app opens, when you come back to it and a minute after a change, asks which copy to keep when two devices both changed, and never uploads AI keys. The file has the same format as `data/school-data.json`.
+
 ## [2.5.0] - 2026-11-06
 
 ### Added
