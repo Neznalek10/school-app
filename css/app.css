@@ -1440,3 +1440,12 @@ a.slide-badge:hover { background: color-mix(in srgb, var(--accent) 22%, transpar
 .storage-status.is-warn { background: var(--warn-soft); color: var(--warn-text); }
 .storage-status.is-bad { background: var(--bad-soft); color: var(--bad-text); }
 .storage-card .setting-buttons { margin-top: 8px; }
+
+/* GitHub card (Account): the connect form stacks its fields; the auto-sync switch is a plain checkbox with a label. */
+.gh-form { display: flex; flex-direction: column; gap: 6px; padding: 4px 0; }
+.gh-form .field-label { margin-top: 6px; }
+.gh-form .btn { margin-top: 10px; }
+.gh-switch { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; color: var(--text-2); cursor: pointer; }
+.gh-switch input { width: 20px; height: 20px; accent-color: var(--accent); }
+[data-github] .notice { margin: 8px 0; }
+[data-github] .setting-buttons { flex-wrap: wrap; margin: 8px 0 4px; }

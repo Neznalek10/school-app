@@ -13,6 +13,7 @@ import { run } from './harness.mjs';
 const TEST_FILES = [
   'harness.test.mjs',
   'text.test.mjs',
+  'github.test.mjs',
   'snapshot.test.mjs',
   'client.test.mjs',
   'engine.test.mjs',
