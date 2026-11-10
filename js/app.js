@@ -28,6 +28,7 @@ import { welcomeView } from './views/welcome.js';
 import { testCheckView } from './views/testcheck.js';
 import { syncState, onSyncChange, dismissConflictNotice } from './sync/engine.js';
 import { announceUpdate, watchForUpdates } from './update.js';
+import { startGitHubSync } from './github-sync.js';
 import { setLocale, browserLanguage, uiLanguage } from './locale.js';
 import { startTranslating, applyLanguage } from './i18n.js';
 
@@ -344,6 +345,7 @@ function start() {
   renderShell();
   startTranslating();
   registerServiceWorker();
+  startGitHubSync();
   watchConflictNotice();
   navigator.storage?.persist?.().catch(() => {});
   window.addEventListener('hashchange', () => app.render());

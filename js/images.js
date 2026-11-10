@@ -11,6 +11,7 @@
  *
  * Invariants: the longest side never exceeds the maximum, small photos are never enlarged, sizes are integers >= 1.
  */
+import { bytesToBase64 } from './text.js';
 
 /** The most photos one check accepts. */
 export const MAX_PHOTOS = 8;
@@ -27,7 +28,6 @@ export const MAX_FILE_BYTES = 30 * 1024 * 1024;
 /** Background painted under the photo, because JPEG has no transparency. */
 const BACKGROUND_COLOR = '#ffffff';
 const JPEG_TYPE = 'image/jpeg';
-const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 /**
  * Scales a size down so its longest side fits `maxSide`, keeping the aspect ratio.
@@ -47,24 +47,6 @@ export function fitSize(width, height, maxSide = MAX_SIDE) {
     width: Math.max(1, Math.round(width * scale)),
     height: Math.max(1, Math.round(height * scale)),
   };
-}
-
-/**
- * Encodes bytes as base64 (btoa is missing in some runtimes and cannot take binary strings safely).
- *
- * @param {Uint8Array} bytes The data.
- * @returns {string} Base64 text with padding.
- */
-function toBase64(bytes) {
-  let out = '';
-  // Every 3 bytes become 4 characters of 6 bits each.
-  for (let i = 0; i < bytes.length; i += 3) {
-    const chunk = (bytes[i] << 16) | ((bytes[i + 1] ?? 0) << 8) | (bytes[i + 2] ?? 0);
-    out += BASE64_ALPHABET[(chunk >> 18) & 63] + BASE64_ALPHABET[(chunk >> 12) & 63];
-    out += i + 1 < bytes.length ? BASE64_ALPHABET[(chunk >> 6) & 63] : '=';
-    out += i + 2 < bytes.length ? BASE64_ALPHABET[chunk & 63] : '=';
-  }
-  return out;
 }
 
 /**
@@ -93,7 +75,7 @@ async function canvasToDataUrl(canvas, quality) {
   if (typeof canvas.convertToBlob === 'function') {
     const blob = await canvas.convertToBlob({ type: JPEG_TYPE, quality });
     const bytes = new Uint8Array(await blob.arrayBuffer());
-    return `data:${JPEG_TYPE};base64,${toBase64(bytes)}`;
+    return `data:${JPEG_TYPE};base64,${bytesToBase64(bytes)}`;
   }
   return canvas.toDataURL(JPEG_TYPE, quality);
 }
