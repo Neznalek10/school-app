@@ -68,7 +68,7 @@ function session(id) {
   return null;
 }
 
-export const ACCOUNT_KEYS = ['subjects', 'notes', 'events', 'sources', 'lessons', 'chats', 'settings', 'chem', 'checks'];
+export const ACCOUNT_KEYS = ['subjects', 'notes', 'events', 'sources', 'lessons', 'chats', 'settings', 'chem', 'checks', 'inbox'];
 
 export const uid = prefix => `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -100,6 +100,8 @@ export const store = {
   chem: {},
   /** Saved photo test checks (CheckRecord[], text only: photos are never stored). */
   checks: [],
+  /** Ids of Cockpit inbox items already imported (js/cockpit-inbox.js); synced with the account's data. */
+  inbox: [],
   settings: freshSettings(),
 
   /**
@@ -142,6 +144,7 @@ export const store = {
     this.chats = read(key('chats'), {});
     this.chem = read(key('chem'), {});
     this.checks = read(key('checks'), []);
+    this.inbox = read(key('inbox'), []);
     const saved = read(key('settings'), {});
     this.settings = {
       ...DEFAULT_SETTINGS,

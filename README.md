@@ -212,6 +212,14 @@ From then on the app syncs by itself: when it opens, when you come back to it, a
 
 Uploaded files (PDFs, images) are not synced.
 
+#### Cockpit inbox
+
+A personal assistant program ("Cockpit") can add tests, homework and events for you without touching the shared data file, so it never causes a "which copy to keep" question. It writes `cockpit-inbox.json` in the same repository and folder as your data file (`school-data.json` gives `cockpit-inbox.json`, `dir/x.json` gives `dir/cockpit-inbox.json`). After each sync that leaves this device in step with GitHub, the app reads that file with the same token and adds every new item to the calendar, then shows "Cockpit added 2 items". A missing file means nothing to add.
+
+Format: `{"app": "cockpit-inbox", "format": 1, "items": [...]}`. Each item has `id` (`ck-` plus 4 to 60 lowercase letters, digits or dashes), `account` (an account id, or empty for the first account), `type` (`test`, `homework` or `event`), `subjectId` and `subject` (the app looks for the id first, then the name ignoring case), `title` (1 to 200 characters), `date` (`YYYY-MM-DD`), `time` (empty or `HH:MM`), `description` (up to 4000 characters) and `created` (ISO time). Invalid items, and items whose subject cannot be found, are skipped and tried again next time. An event with the same subject, type, date and title is not added twice.
+
+Imported events are normal events with one extra field, `source: "cockpit"`. The ids already imported are kept in each account's `inbox` list (the newest 1000), which syncs with the rest of the data. A problem reading the inbox never stops the sync.
+
 ### Moving to another computer
 
 **By hand.** Copy the whole folder, except `venv/`, to the other computer, create the venv there (see Installation) and start the app. Copy `.env` too if you want your AI key there, or type the key again.

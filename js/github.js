@@ -192,14 +192,15 @@ async function request(settings, path, { method = 'GET', body, accept = 'applica
  * The API path of the data file, with every part encoded.
  *
  * @param {{ owner: string, repo: string, path: string }} settings Repository and file path.
+ * @param {string} [filePath] Another file in the same repository; defaults to the data file.
  * @returns {string} For example "/repos/user/data/contents/school-data.json".
  * @throws {GitHubError} Kind format when the repository or path is not valid.
  */
-function contentsPath(settings) {
-  if (!parseRepo(`${settings.owner}/${settings.repo}`) || !isSafePath(settings.path)) {
+function contentsPath(settings, filePath = settings.path) {
+  if (!parseRepo(`${settings.owner}/${settings.repo}`) || !isSafePath(filePath)) {
     throw new GitHubError('format', 'Check the repository name and the file path in Account.');
   }
-  const file = settings.path.split('/').map(encodeURIComponent).join('/');
+  const file = filePath.split('/').map(encodeURIComponent).join('/');
   return `/repos/${encodeURIComponent(settings.owner)}/${encodeURIComponent(settings.repo)}/contents/${file}`;
 }
 
@@ -252,4 +253,20 @@ export async function pushRemote(settings, text, { sha = '', message = 'Save sch
   const saved = data?.content?.sha;
   if (typeof saved !== 'string') throw new GitHubError('format', 'GitHub saved the file but sent an unexpected answer.');
   return saved;
+}
+
+/**
+ * Reads the text of any file in the repository (used for the Cockpit inbox), in one raw request.
+ *
+ * @param {{ owner: string, repo: string, path: string, token: string }} settings GitHub settings.
+ * @param {string} filePath Path inside the repository, for example "cockpit-inbox.json".
+ * @param {{ fetcher?: typeof fetch }} [options] Dependencies.
+ * @returns {Promise<string | null>} The file's text, or null when the file does not exist (404).
+ * @throws {GitHubError} For a wrong token or a network problem.
+ */
+export async function fetchFileText(settings, filePath, { fetcher = fetch } = {}) {
+  const res = await request(settings, contentsPath(settings, filePath), { accept: 'application/vnd.github.raw+json', fetcher });
+  if (res.status === 404) return null;
+  if (!res.ok) throw statusError(res.status);
+  return res.text();
 }
