@@ -11,11 +11,14 @@
  * Invariants: AI keys are removed before anything is uploaded, and the keys on this device survive a load.
  * The settings live under SETTINGS_KEY, outside every tracked prefix, so the token never reaches the data
  * file, a backup or GitHub. A load never runs while this device has changes GitHub does not have.
+ * The Cockpit inbox (js/cockpit-inbox.js) is only read after a sync that leaves this device in step with
+ * GitHub, never while a conflict is open; a failure there is recorded as `inboxError` and never breaks sync.
  */
 import {
   takeSnapshot, applySnapshot, redactSecrets, canonical, contentHash,
   collectUntrustedKeys, restoreUntrustedKeys, fillSecrets,
 } from './sync/snapshot.js';
+import { importCockpitInbox } from './cockpit-inbox.js';
 import { fetchRemote, pushRemote, buildDataFile, parseDataFile, planSync, parseRepo, isSafePath, DEFAULT_PATH } from './github.js';
 
 /** Storage key of the GitHub settings; deliberately outside the tracked prefixes (school., school-fr., vocab2.). */
@@ -27,11 +30,11 @@ export const CHECK_INTERVAL_MS = 60000;
 /**
  * Settings and the bookkeeping of the last sync.
  * @typedef {{ owner: string, repo: string, path: string, token: string, auto: boolean, sha: string,
- *   hash: string, revision: number, lastSync: number, conflict: boolean, error: string }} GitHubSettings
+ *   hash: string, revision: number, lastSync: number, conflict: boolean, error: string, inboxError: string }} GitHubSettings
  */
 
 /** Settings of a device that has not been set up. */
-const EMPTY = { owner: '', repo: '', path: DEFAULT_PATH, token: '', auto: true, sha: '', hash: '', revision: 0, lastSync: 0, conflict: false, error: '' };
+const EMPTY = { owner: '', repo: '', path: DEFAULT_PATH, token: '', auto: true, sha: '', hash: '', revision: 0, lastSync: 0, conflict: false, error: '', inboxError: '' };
 
 /** Listeners told after every sync attempt, so the Account page can repaint. */
 const listeners = new Set();
@@ -214,15 +217,48 @@ export async function loadNow({ storage, fetcher = fetch, now = Date.now }) {
 }
 
 /**
- * Brings this device and GitHub in step: saves, loads or reports a conflict, as planSync decides.
+ * Imports the Cockpit inbox when GitHub is set up and no conflict is open. A failure is recorded as
+ * `inboxError` (shown nowhere loudly) and never thrown, so it cannot break the sync that called it.
  *
- * @param {{ storage: Storage, fetcher?: typeof fetch, allowLoad?: boolean, now?: () => number }} options
+ * @param {{ storage: Storage, fetcher: typeof fetch, now: () => number, inbox?: InboxHooks, reloading: boolean }} options
+ *   `reloading`: the page is about to reload (after a load), so the message must outlive the page.
+ * @returns {Promise<number>} How many events were added.
+ */
+async function importInbox({ storage, fetcher, now, inbox = {}, reloading }) {
+  const settings = readGitHub(storage);
+  if (!isConfigured(settings) || settings.conflict) return 0;
+  try {
+    const added = await importCockpitInbox({ settings, storage, fetcher, open: inbox.open, now });
+    if (settings.inboxError) writeGitHub(storage, { inboxError: '' });
+    if (added) inbox.onImported?.(added, { reloading });
+    return added;
+  } catch (error) {
+    writeGitHub(storage, { inboxError: error.message });
+    return 0;
+  } finally {
+    notify();
+  }
+}
+
+/**
+ * Hooks the app gives the inbox import.
+ * @typedef {{ open?: () => ({ id: string, data: object, save: (key: string) => void } | null),
+ *   onImported?: (count: number, info: { reloading: boolean }) => void }} InboxHooks
+ */
+
+/**
+ * Brings this device and GitHub in step: saves, loads or reports a conflict, as planSync decides. When that
+ * leaves this device in step with GitHub (nothing to do, or a save or load worked) the Cockpit inbox is imported.
+ *
+ * @param {{ storage: Storage, fetcher?: typeof fetch, allowLoad?: boolean, now?: () => number, inbox?: InboxHooks }} options
  *   `allowLoad: false` only saves (used while the student is working, so the page never reloads under them).
+ *   `inbox`: where the open account lives and what to tell the student; without it the inbox still imports
+ *   (into storage), silently.
  * @returns {Promise<'none'|'saved'|'unchanged'|'loaded'|'missing'|'conflict'|'busy'|'off'>} What happened;
  *   'off' when GitHub sync is not set up or turned off.
  * @throws {import('./github.js').GitHubError} For a wrong token, a missing repository or a network problem.
  */
-export async function checkNow({ storage, fetcher = fetch, allowLoad = true, now = Date.now }) {
+export async function checkNow({ storage, fetcher = fetch, allowLoad = true, now = Date.now, inbox }) {
   const settings = readGitHub(storage);
   if (!isConfigured(settings) || !settings.auto) return 'off';
   const { hash } = localState(storage);
@@ -231,25 +267,34 @@ export async function checkNow({ storage, fetcher = fetch, allowLoad = true, now
   const remote = await guarded(storage, () => fetchRemote(settings, { fetcher, withText: false }));
   if (remote === 'busy') return 'busy';
   const plan = planSync({ remoteSha: remote?.sha || '', knownSha: settings.sha, localHash: hash, knownHash: settings.hash });
-  if (plan === 'save') return saveNow({ storage, fetcher, now });
-  if (plan === 'load') return allowLoad ? loadNow({ storage, fetcher, now }) : 'none';
-  if (plan === 'conflict') {
+  let result = 'none';
+  let inStep = false;
+  if (plan === 'save') {
+    result = await saveNow({ storage, fetcher, now });
+    inStep = result === 'saved' || result === 'unchanged';
+  } else if (plan === 'load') {
+    result = allowLoad ? await loadNow({ storage, fetcher, now }) : 'none';
+    inStep = result === 'loaded';
+  } else if (plan === 'conflict') {
     writeGitHub(storage, { conflict: true, error: '' });
     notify();
     return 'conflict';
+  } else {
+    inStep = true;
   }
-  return 'none';
+  if (inStep) await importInbox({ storage, fetcher, now, inbox, reloading: result === 'loaded' });
+  return result;
 }
 
 /**
  * Starts the automatic sync of this page: once now, whenever the page comes back to the screen, every
  * minute while it is visible (save only), and when it is hidden (save only, best effort).
  *
- * @param {{ storage?: Storage, fetcher?: typeof fetch, doc?: Document, reload?: () => void }} [options]
+ * @param {{ storage?: Storage, fetcher?: typeof fetch, doc?: Document, reload?: () => void, inbox?: InboxHooks }} [options]
  *   Dependencies; the defaults are the page's own.
  * @returns {void}
  */
-export function startGitHubSync({ storage = globalThis.localStorage, fetcher = globalThis.fetch?.bind(globalThis), doc = globalThis.document, reload = () => globalThis.location.reload() } = {}) {
+export function startGitHubSync({ storage = globalThis.localStorage, fetcher = globalThis.fetch?.bind(globalThis), doc = globalThis.document, reload = () => globalThis.location.reload(), inbox } = {}) {
   if (!storage || !fetcher || !doc) return;
   /**
    * Runs one check and reloads the page after a load; errors are already recorded for the Account page.
@@ -259,7 +304,7 @@ export function startGitHubSync({ storage = globalThis.localStorage, fetcher = g
    */
   const run = async allowLoad => {
     try {
-      if (await checkNow({ storage, fetcher, allowLoad }) === 'loaded') reload();
+      if (await checkNow({ storage, fetcher, allowLoad, inbox }) === 'loaded') reload();
     } catch { /* shown on the Account page */ }
   };
   run(true);

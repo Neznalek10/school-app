@@ -338,6 +338,42 @@ function watchConflictNotice() {
   check();
 }
 
+/** Session key that carries the Cockpit message over the reload that follows a load from GitHub. */
+const COCKPIT_PENDING_KEY = 'school-gh.cockpit-added';
+
+/**
+ * Tells the student how many items Cockpit added.
+ *
+ * @param {number} count How many events were added.
+ * @returns {void}
+ */
+const announceCockpit = count => app.toast(`Cockpit added ${count} ${count === 1 ? 'item' : 'items'}`, { kind: 'success' });
+
+/**
+ * What the Cockpit inbox import needs from the app: the signed-in account (so views see the new events)
+ * and the message. Before a reload the count waits in sessionStorage and is shown after the page restarts.
+ */
+const cockpitInbox = {
+  open: () => (store.account ? { id: store.account.id, data: store, save: key => store.save(key) } : null),
+  onImported(count, { reloading }) {
+    if (reloading) {
+      try { sessionStorage.setItem(COCKPIT_PENDING_KEY, String(count)); } catch { /* the message is only lost */ }
+      return;
+    }
+    announceCockpit(count);
+    if (store.account) app.render();
+  },
+};
+
+/** Shows the Cockpit message that was kept across a reload, once. */
+function showPendingCockpit() {
+  try {
+    const count = Number(sessionStorage.getItem(COCKPIT_PENDING_KEY));
+    sessionStorage.removeItem(COCKPIT_PENDING_KEY);
+    if (count > 0) announceCockpit(count);
+  } catch { /* nothing was kept */ }
+}
+
 function start() {
   // Before anyone signs in, the welcome screen follows the browser's language.
   setLocale({ language: browserLanguage() });
@@ -345,7 +381,8 @@ function start() {
   renderShell();
   startTranslating();
   registerServiceWorker();
-  startGitHubSync();
+  showPendingCockpit();
+  startGitHubSync({ inbox: cockpitInbox });
   watchConflictNotice();
   navigator.storage?.persist?.().catch(() => {});
   window.addEventListener('hashchange', () => app.render());

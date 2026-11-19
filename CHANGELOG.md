@@ -4,6 +4,12 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 The 1.x history lived in the earlier project (school-learning-app). This file starts at 2.0.0.
 
+## [2.7.0] - 2026-11-19
+
+### Added
+
+- Cockpit inbox: the personal assistant Cockpit can add tests, homework and events through a separate `cockpit-inbox.json` in the GitHub repository, next to the data file. After a sync that leaves the device in step with GitHub, the app adds the new items to the calendar (matching the account and the subject, skipping duplicates), shows "Cockpit added N items" and lets the normal sync save them. Imported events carry `source: "cockpit"`. The imported ids are kept in a new per-account `inbox` list that syncs and is included in backups.
+
 ## [2.6.1] - 2026-11-10
 
 ### Changed

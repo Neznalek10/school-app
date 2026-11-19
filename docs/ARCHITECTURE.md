@@ -55,6 +55,7 @@ Two rules shape everything else:
 | File | Responsibility |
 |---|---|
 | `js/store.js` | Account store. Saves per-account data under `school.` keys in `localStorage`. |
+| `js/cockpit-inbox.js` | Cockpit inbox: reads `cockpit-inbox.json` next to the GitHub data file after a sync that leaves the device in step, adds new items as events (`source: "cockpit"`) and records consumed ids in the account key `inbox`. Called by `js/github-sync.js`. |
 | `js/subjects.js` | Default subjects (Languages only), starter kits (`KITS`), `subjectFromKit`, `hasTool`, the preset assistants. |
 | `js/setup.js` | Subject setup: the interview prompt, `parseSetup`, `applySetup`, `setupSummary`. Imports no store, to avoid an import cycle. |
 | `js/views/setup.js`, `js/views/setup-apply.js` | The setup page and the shared "apply a setup" step used by the chat card and the setup page. |

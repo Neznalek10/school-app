@@ -39,6 +39,8 @@ export const NOUNS = {
 };
 
 export const WORDS = {
+  // Cockpit inbox
+  'Cockpit added 1 item': 'Cockpit přidal 1 položku',
   // GitHub sync (Account)
   'Keep your notes, tests and progress in your own private GitHub repository, so every phone and computer you sign in on shares them. AI keys are never uploaded.': 'Ukládej poznámky, testy a pokrok do vlastního soukromého repozitáře na GitHubu, aby je sdílel každý telefon a počítač, kde se přihlásíš. Klíče k AI se nikdy nenahrávají.',
   'Repository': 'Repozitář',
@@ -662,6 +664,7 @@ const P = (template, fn) => [
 ];
 
 export const PATTERNS = [
+  P('Cockpit added {n} items', n => `Cockpit přidal ${n} ${pickForm(num(n), ['položku', 'položky', 'položek'])}`),
   P('Last synced {x}.', when => `Naposledy synchronizováno ${when}.`),
   P('GitHub answered with an error ({x}).', code => `GitHub odpověděl chybou (${code}).`),
   P('Hi, {x}', name => `Ahoj, ${name}`),

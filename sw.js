@@ -23,6 +23,7 @@ const CORE = [
   './js/apps.js',
   './js/backup.js',
   './js/check.js',
+  './js/cockpit-inbox.js',
   './js/curriculum.js',
   './js/czech.js',
   './js/docx.js',
